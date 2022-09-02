@@ -24,6 +24,6 @@ Package: gnome-network-displays
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}, network-manager, wpasupplicant
 Description: miracast application for the GNOME desktop
- This application allows you to stream your display and 
- audio to other devices via Wi-Fi (aka miracast). Note: 
+ This application allows you to stream your display and
+ audio to other devices via Wi-Fi (aka miracast). Note:
  wpasupplicant is required, iwd won't work. 
