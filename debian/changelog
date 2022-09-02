@@ -1,5 +1,5 @@
-gnome-network-displays (0.90.5-1) UNRELEASED; urgency=medium
+gnome-network-displays (0.90.5-1) unstable; urgency=medium
 
   * Initial release. (Closes: #995899)
 
- -- Matthias Geiger <matthias.geiger1024@tutanota.de>  Sat, 06 Aug 2022 16:22:46 -0700
+ -- Matthias Geiger <matthias.geiger1024@tutanota.de>  Thu, 01 Sep 2022 21:48:51 -0400
