@@ -1,3 +1,9 @@
+gnome-network-displays (0.90.5-2) unstable; urgency=medium
+
+  * Rebuild after NEW acceptance
+
+ -- Jeremy Bicha <jbicha@ubuntu.com>  Sun, 25 Sep 2022 14:17:33 -0400
+
 gnome-network-displays (0.90.5-1) unstable; urgency=medium
 
   * Initial release. (Closes: #995899)
