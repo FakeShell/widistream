@@ -1,3 +1,9 @@
+gnome-network-displays (0.90.5-3) UNRELEASED; urgency=medium
+
+  * Fixed wrong VCS fields in d/control
+
+ -- Matthias Geiger <matthias.geiger1024@tutanota.de>  Mon, 03 Oct 2022 16:13:11 -0700
+
 gnome-network-displays (0.90.5-2) unstable; urgency=medium
 
   * Rebuild after NEW acceptance
