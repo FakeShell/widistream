@@ -1,4 +1,4 @@
-gnome-network-displays (0.90.5-3) UNRELEASED; urgency=medium
+gnome-network-displays (0.90.5-3) unstable; urgency=medium
 
   * Fixed wrong VCS fields in d/control
 
