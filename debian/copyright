@@ -5,12 +5,12 @@ Upstream-Contact: Benjamin Berg <bberg@redhat.com>
 
 Files: *
 Copyright: 2018-2022 Benjamin Berg <bberg@redhat.com>
-	   2018-2022 The gnome-network-displays contributers
+           2018-2022 The gnome-network-displays contributers
 License: GPL-3+
 
 Files: src/wfd/wfd-session-pool.c
 Copyright: 2008 Wim Taymans <wim.taymans@gmail.com>
-	   2018 Benjamin Berg <bberg@redhat.com>
+           2018 Benjamin Berg <bberg@redhat.com>
 License: GPL-3+
 
 Files: data/org.gnome.NetworkDisplays.appdata*
