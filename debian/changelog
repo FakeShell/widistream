@@ -1,8 +1,14 @@
-gnome-network-displays (0.91.0-1) UNRELEASED; urgency=medium
+gnome-network-displays (0.91.0-1) unstable; urgency=medium
 
+  * Team upload
   * New upstream release
+    - Add support for Miracast over Infrastructure (MICE) protocol
+    - Add support for Chromecast protocol
+    - Add support for casting a virtual screen
+  * Build-Depends: Add libjson-glib-dev, libprotobuf-c-dev, libsoup-3.0-dev
+  * Update standards version to 4.6.2, no changes needed
 
- -- Jeremy Bícha <jbicha@ubuntu.com>  Fri, 19 Jan 2024 09:03:49 -0500
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Fri, 19 Jan 2024 09:14:18 -0500
 
 gnome-network-displays (0.90.5-3) unstable; urgency=medium
 
