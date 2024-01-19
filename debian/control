@@ -18,7 +18,7 @@ Build-Depends: cmake,
                libpulse-dev,
                libsoup-3.0-dev,
                meson (>= 0.46.1)
-Standards-Version: 4.6.1
+Standards-Version: 4.6.2
 Homepage: https://gitlab.gnome.org/GNOME/gnome-network-displays
 Vcs-Browser: https://salsa.debian.org/gnome-team/gnome-network-displays
 Vcs-Git: https://salsa.debian.org/gnome-team/gnome-network-displays.git
