@@ -1,3 +1,9 @@
+gnome-network-displays (0.91.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Fri, 19 Jan 2024 09:03:49 -0500
+
 gnome-network-displays (0.90.5-3) unstable; urgency=medium
 
   * Fixed wrong VCS fields in d/control
