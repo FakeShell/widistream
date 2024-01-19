@@ -76,10 +76,13 @@ nd_meta_sink_update (NdMetaSink *meta_sink)
 
       g_object_get (sink, "priority", &priority, NULL);
       if (priority == best_priority)
-        g_debug ("MetaSink: Found two sinks with identical priority! Prefered order is undefined.\n");
+        g_debug ("MetaSink: Found two sinks with identical priority! Preferred order is undefined. Priority: %i", priority);
 
       if (priority > best_priority)
-        best_sink = sink;
+        {
+          best_sink = sink;
+          best_priority = priority;
+        }
     }
 
   /* Nothing has changed */
@@ -98,11 +101,10 @@ nd_meta_sink_update (NdMetaSink *meta_sink)
       g_signal_connect_object (meta_sink->current_sink,
                                "notify", (GCallback) nd_meta_sink_notify_sink_cb,
                                meta_sink, G_CONNECT_SWAPPED);
+      g_debug ("MetaSink: Priority sink updated. Priority: %i", best_priority);
     }
   else
-    {
-      g_debug ("MetaSink: No usable sink is left, object has become invalid.");
-    }
+    g_debug ("MetaSink: No usable sink is left, object has become invalid.");
 
   /* Notify the pass-through properties */
   g_object_notify (G_OBJECT (meta_sink), "display-name");
@@ -325,7 +327,7 @@ void
 nd_meta_sink_add_sink (NdMetaSink *meta_sink,
                        NdSink     *sink)
 {
-  g_assert (!g_ptr_array_find (meta_sink->sinks, sink, NULL));
+  g_assert (!nd_meta_sink_has_sink (meta_sink, sink));
 
   g_ptr_array_add (meta_sink->sinks, g_object_ref (sink));
 

@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <avahi-gobject/ga-client.h>
+#include <avahi-gobject/ga-service-browser.h>
 #include <glib/gi18n.h>
 #include "gnome-network-displays-config.h"
 #include "nd-window.h"
@@ -23,8 +25,10 @@
 #include "nd-sink-row.h"
 #include "nd-codec-install.h"
 #include "nd-meta-provider.h"
-#include "nd-wfd-p2p-registry.h"
+#include "nd-nm-device-registry.h"
 #include "nd-dummy-provider.h"
+#include "nd-wfd-mice-provider.h"
+#include "nd-cc-provider.h"
 
 #include <gst/gst.h>
 
@@ -35,8 +39,9 @@ struct _NdWindow
 {
   GtkApplicationWindow parent_instance;
 
+  GaClient            *avahi_client;
   NdMetaProvider      *meta_provider;
-  NdWFDP2PRegistry    *wfd_p2p_registry;
+  NdNMDeviceRegistry  *nm_device_registry;
 
   NdScreencastPortal  *portal;
   gboolean             use_x11;
@@ -316,6 +321,42 @@ find_sink_list_row_activated_cb (NdWindow *self, NdSinkRow *row, NdSinkList *sin
 }
 
 static void
+gnome_nd_window_constructed (GObject *obj)
+{
+  g_autoptr(GError) error = NULL;
+  g_autoptr(NdWFDMiceProvider) mice_provider = NULL;
+  g_autoptr(NdCCProvider) cc_provider = NULL;
+  NdWindow *self = ND_WINDOW (obj);
+
+  self->cancellable = g_cancellable_new ();
+  self->avahi_client = ga_client_new (GA_CLIENT_FLAG_NO_FLAGS);
+
+
+  if (!ga_client_start (self->avahi_client, &error))
+    {
+      g_warning ("NdWindow: Failed to start Avahi Client");
+      if (error != NULL)
+        g_warning ("NdWindow: Error: %s", error->message);
+      return;
+    }
+
+  g_debug ("NdWindow: Got avahi client");
+
+  mice_provider = nd_wfd_mice_provider_new (self->avahi_client);
+  cc_provider = nd_cc_provider_new (self->avahi_client);
+
+  if (!nd_wfd_mice_provider_browse (mice_provider, error) || !nd_cc_provider_browse (cc_provider, error))
+    {
+      g_warning ("NdWindow: Avahi client failed to browse: %s", error->message);
+      return;
+    }
+
+  g_debug ("NdWindow: Got avahi browser");
+  nd_meta_provider_add_provider (self->meta_provider, ND_PROVIDER (mice_provider));
+  nd_meta_provider_add_provider (self->meta_provider, ND_PROVIDER (cc_provider));
+}
+
+static void
 gnome_nd_window_finalize (GObject *obj)
 {
   NdWindow *self = ND_WINDOW (obj);
@@ -329,11 +370,22 @@ gnome_nd_window_finalize (GObject *obj)
   g_clear_object (&self->stream_sink);
 
   g_clear_object (&self->meta_provider);
-  g_clear_object (&self->wfd_p2p_registry);
+  g_clear_object (&self->nm_device_registry);
+  g_clear_object (&self->avahi_client);
 
   g_clear_pointer (&self->sink_property_bindings, g_ptr_array_unref);
 
   G_OBJECT_CLASS (gnome_nd_window_parent_class)->finalize (obj);
+}
+
+static void
+gnome_nd_window_dispose (GObject *obj)
+{
+  NdWindow *self = ND_WINDOW (obj);
+
+  g_object_run_dispose (G_OBJECT (self->avahi_client));
+
+  G_OBJECT_CLASS (gnome_nd_window_parent_class)->dispose (obj);
 }
 
 static void
@@ -342,7 +394,9 @@ gnome_nd_window_class_init (NdWindowClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
 
+  object_class->constructed = gnome_nd_window_constructed;
   object_class->finalize = gnome_nd_window_finalize;
+  object_class->dispose = gnome_nd_window_dispose;
 
   ND_TYPE_SINK_LIST;
   ND_TYPE_CODEC_INSTALL;
@@ -379,7 +433,7 @@ nd_screencast_portal_init_async_cb (GObject      *source_object,
     {
       if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
         {
-          g_warning ("Error initing screencast portal: %s", error->message);
+          g_warning ("Error initializing screencast portal: %s", error->message);
 
           window = ND_WINDOW (user_data);
 
@@ -433,7 +487,7 @@ stream_stop_clicked_cb (NdWindow *self)
 }
 
 static void
-on_meta_provider_has_provider_changed_cb (NdWindow *self, NdSinkRow *row, NdSinkList *sink_list)
+on_meta_provider_has_provider_changed_cb (NdWindow *self, GParamSpec *pspec, NdMetaProvider *provider)
 {
   gboolean has_providers;
 
@@ -459,7 +513,7 @@ gnome_nd_window_init (NdWindow *self)
                            self,
                            G_CONNECT_SWAPPED);
 
-  self->wfd_p2p_registry = nd_wfd_p2p_registry_new (self->meta_provider);
+  self->nm_device_registry = nd_nm_device_registry_new (self->meta_provider);
   nd_sink_list_set_provider (self->find_sink_list, ND_PROVIDER (self->meta_provider));
 
   if (g_strcmp0 (g_getenv ("NETWORK_DISPLAYS_DUMMY"), "1") == 0)

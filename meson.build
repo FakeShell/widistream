@@ -1,5 +1,5 @@
 project('gnome-network-displays', 'c',
-  version: '0.90.5',
+  version: '0.91.0',
   meson_version: '>= 0.46.1',
 )
 
@@ -18,7 +18,8 @@ configure_file(
   configuration: config_h,
 )
 add_project_arguments([
-  '-I' + meson.build_root(),
+  '-I' + meson.current_build_dir(),
+  '-DG_LOG_DOMAIN="Gnd"',
 ], language: 'c')
 
 enable_firewalld_zone = get_option('firewalld_zone')

@@ -17,10 +17,13 @@ Build
 
 To build it locally:
 
-- clone the repository
-- install `meson`
-- run `meson build` on the cloned repository
-- run `meson install` on the `build` folder created by meson
+- Install build dependencies (e.g. on Fedora with `dnf build-dep gnome-network-displays`, on Ubuntu based system with `apt install libgstrtspserver-1.0-dev libgstreamer-plugins-base1.0-dev libavahi-client-dev libavahi-gobject-dev libgtk-3-dev libnm-dev libpulse-dev libprotobuf-c-dev libjson-glib-dev libsoup-3.0-dev`)
+- Install `meson`
+- Clone the repository
+- `cd gnome-network-displays`
+- `meson build`
+- `cd build`
+- `meson install`
 
 Devices
 =======
@@ -29,20 +32,23 @@ The following devices have been tested:
  * Measy "Miracast Receiver" Model A2W
    - Announces itself as EZMirror/EZCast
    - Only supports uncompressed audio (LPCM) which is not supported yet
+ * Microsoft 4K Wireless Display Adapter
  * LG WebOS TV
  * MontoView (Software Revision 2.18.02)
  * MiraScreen
  * Clayton TV (model CL43UHD19BSW)
  * HP Elite x3 Lap Dock
+ * Samsung M7 43" Smart Monitor (model LS43AM700UUXEN)
+ * Hisense AE7000
 
 Testing
 =======
 
-For testing purposes you can run with NETWORK_DISPLAYS_DUMMY=1 set. In that case, a dummy
+For testing purposes you can run with `NETWORK_DISPLAYS_DUMMY=1` set. In that case, a dummy
 sink will be provided that allows connecting on localhost using any RTSP capable
 client to test WFD streaming.
 
-You can connect to rtsp://localhost:7236/wfd1.0 then.
+You can connect to `rtsp://localhost:7236/wfd1.0` then.
 
 Debugging
 =========
@@ -79,9 +85,9 @@ ensuring that support exists:
    a lot more information. Theoretically it may be that we see the device, but
    think that it is not WiFi Display capable (e.g. because the `wpa_supplicant`
    support is missing, see further below). Look out for the following messages:
-   * `WFDP2PRegistry: Got NMClient`:
+   * `NdNMDeviceRegistry: Got NMClient`:
       The connection to NetworkManager works.
-   * `WFDP2PRegistry: Found a new device, creating provider`:
+   * `NdNMDeviceRegistry: Found a new device, creating provider`:
       This means that we have a seemingly usable P2P device installed.
    * `WFDP2PProvider: Ignoring peer "XX:XX:XX:XX:XX" (Y) as it has no WFDIEs set`:
       This means there is a P2P device, but it does not seem to support WiFi

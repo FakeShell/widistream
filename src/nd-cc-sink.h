@@ -1,6 +1,7 @@
-/* nd-wfd-p2p-registry.h
+/* nd-cc-sink.h
  *
- * Copyright 2018 Benjamin Berg <bberg@redhat.com>
+ * Copyright 2022 Christian Glombek <lorbus@fedoraproject.org>
+ * Copyright 2022 Anupam Kumar <kyteinsky@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,13 +19,18 @@
 
 #pragma once
 
-#include "nd-meta-provider.h"
+#include <gio/gio.h>
+#include "nd-sink.h"
 
 G_BEGIN_DECLS
 
-#define ND_TYPE_WFD_P2P_REGISTRY (nd_wfd_p2p_registry_get_type ())
-G_DECLARE_FINAL_TYPE (NdWFDP2PRegistry, nd_wfd_p2p_registry, ND, WFD_P2P_REGISTRY, GObject)
+#define ND_TYPE_CC_SINK (nd_cc_sink_get_type ())
+G_DECLARE_FINAL_TYPE (NdCCSink, nd_cc_sink, ND, CC_SINK, GObject)
 
-NdWFDP2PRegistry * nd_wfd_p2p_registry_new (NdMetaProvider * meta_provider);
+NdCCSink * nd_cc_sink_new (GSocketClient * client,
+                           gchar         * name,
+                           gchar         * remote_address);
+
+NdSinkState nd_cc_sink_get_state (NdCCSink *sink);
 
 G_END_DECLS

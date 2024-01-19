@@ -30,7 +30,7 @@ static const WfdResolution cea_resolutions[] = {
   {4096, 2160, 25, FALSE},
   {4096, 2160, 30, FALSE},
   {4096, 2160, 50, FALSE},
-  {4096 ,2160, 60, FALSE},
+  {4096, 2160, 60, FALSE},
 };
 
 static const WfdResolution vesa_resolutions[] = {
@@ -112,9 +112,7 @@ resolution_table_lookup (gint table, guint offset)
       length = G_N_ELEMENTS (vesa_resolutions);
     }
   else
-    {
-      g_return_val_if_reached (NULL);
-    }
+    g_return_val_if_reached (NULL);
 
   if (offset < length)
     return &resolutions[offset];
@@ -144,9 +142,7 @@ sup_for_resolution (gint table, const WfdResolution *resolution)
       length = G_N_ELEMENTS (vesa_resolutions);
     }
   else
-    {
-      g_return_val_if_reached (0);
-    }
+    g_return_val_if_reached (0);
 
   for (gint i = 0; i < length; i++)
     {
@@ -360,7 +356,7 @@ wfd_video_codec_get_max_bitrate_kbit (WfdVideoCodec *self)
       g_warning ("WfdVideoCodec: Unknown level %i", self->level);
     }
 
-  if (self->profile == WFD_H264_PROFILE_HIGH)
+  if (self->profile == WFD_H264_PROFILE_HIGH || self->profile == WFD_H264_PROFILE_CHROMECAST)
     bitrate = bitrate * 1.25;
 
   return bitrate;
@@ -454,7 +450,7 @@ wfd_video_codec_get_descriptor_for_resolution (WfdVideoCodec *self, const WfdRes
   slice_enc_params = 0;
 
   return g_strdup_printf ("00 00 %02X %02X %08X %08X %08X %02X %04X %04X %02x none none",
-                          /* static: native, resolution and prefered display mode */
+                          /* static: native, resolution and preferred display mode */
                           self->profile, self->level,
                           cae_sup, vesa_sup, hh_sup,
                           self->latency, self->min_slice_size,
