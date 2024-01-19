@@ -66,11 +66,15 @@ main (int   argc,
    * application windows, integration with the window manager/compositor, and
    * desktop features such as file opening and single-instance applications.
    */
+#if GLIB_CHECK_VERSION (2, 74, 0)
+  app = gtk_application_new ("org.gnome.NetworkDisplays", G_APPLICATION_DEFAULT_FLAGS);
+#else
   app = gtk_application_new ("org.gnome.NetworkDisplays", G_APPLICATION_FLAGS_NONE);
+#endif
 
   /*
    * We connect to the activate signal to create a window when the application
-   * has been lauched. Additionally, this signal notifies us when the user
+   * has been launched. Additionally, this signal notifies us when the user
    * tries to launch a "second instance" of the application. When they try
    * to do that, we'll just present any existing window.
    *
@@ -80,7 +84,7 @@ main (int   argc,
   g_signal_connect (app, "activate", G_CALLBACK (on_activate), NULL);
 
   /*
-   * Run the application. This function will block until the applicaiton
+   * Run the application. This function will block until the application
    * exits. Upon return, we have our exit code to return to the shell. (This
    * is the code you see when you do `echo $?` after running a command in a
    * terminal.

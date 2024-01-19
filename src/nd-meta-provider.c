@@ -22,12 +22,12 @@
 
 struct _NdMetaProvider
 {
-  GObject     parent_instance;
+  GObject    parent_instance;
 
-  gboolean    discover;
+  gboolean   discover;
 
-  GPtrArray  *sinks;
-  GPtrArray  *providers;
+  GPtrArray *sinks;
+  GPtrArray *providers;
 };
 
 enum {
@@ -61,10 +61,8 @@ provider_sink_added_cb (NdMetaProvider *meta_provider, NdSink *sink, NdProvider 
   meta_sinks = g_ptr_array_new ();
 
   for (gint i = 0; i < meta_provider->sinks->len; i++)
-    {
-      if (nd_meta_sink_matches_sink (g_ptr_array_index (meta_provider->sinks, i), sink))
-        g_ptr_array_add (meta_sinks, g_ptr_array_index (meta_provider->sinks, i));
-    }
+    if (nd_meta_sink_matches_sink (g_ptr_array_index (meta_provider->sinks, i), sink))
+      g_ptr_array_add (meta_sinks, g_ptr_array_index (meta_provider->sinks, i));
 
   if (meta_sinks->len > 1)
     g_warning ("MetaProvider: Found two meta sinks that belong to the same sink. This should not happen!\n");
@@ -94,8 +92,8 @@ provider_sink_added_cb (NdMetaProvider *meta_provider, NdSink *sink, NdProvider 
   else
     {
       meta_sink = nd_meta_sink_new (sink);
-      g_signal_emit_by_name (meta_provider, "sink-added", meta_sink);
       g_ptr_array_add (meta_provider->sinks, meta_sink);
+      g_signal_emit_by_name (meta_provider, "sink-added", meta_sink);
     }
 }
 
@@ -103,7 +101,7 @@ static void
 provider_sink_removed_cb (NdMetaProvider *meta_provider, NdSink *sink, NdProvider *provider)
 {
   g_autoptr(GPtrArray) sink_matches = NULL;
-  NdMetaSink *meta_sink = NULL;
+  g_autoptr(NdMetaSink) meta_sink = NULL;
   guint idx = 0;
 
   g_object_get (sink, "matches", &sink_matches, NULL);
@@ -118,7 +116,7 @@ provider_sink_removed_cb (NdMetaProvider *meta_provider, NdSink *sink, NdProvide
                                               (GEqualFunc) nd_meta_sink_has_sink,
                                               &idx));
 
-  meta_sink = g_ptr_array_index (meta_provider->sinks, idx);
+  meta_sink = g_object_ref (g_ptr_array_index (meta_provider->sinks, idx));
   g_assert (meta_sink != NULL);
   if (nd_meta_sink_remove_sink (meta_sink, sink))
     {
@@ -327,6 +325,7 @@ nd_meta_provider_remove_provider (NdMetaProvider *meta_provider,
 {
   g_autoptr(GList) list = NULL;
   GList *item;
+
   g_assert (provider);
 
   g_signal_handlers_disconnect_by_data (provider, meta_provider);

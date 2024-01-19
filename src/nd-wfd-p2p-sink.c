@@ -79,7 +79,7 @@ static void
 peer_notify_cb (NdWFDP2PSink *self, GParamSpec *pspec, NMWifiP2PPeer *peer)
 {
   /* TODO: Assumes the display name may have changed.
-   *       This is obviously overly agressive, on the other hand
+   *       This is obviously overly aggressive, on the other hand
    *       not really an issue. */
   g_object_notify (G_OBJECT (self), "display-name");
 }
@@ -131,15 +131,15 @@ nd_wfd_p2p_sink_get_property (GObject    *object,
     case PROP_MATCHES:
       {
         g_autoptr(GPtrArray) res = NULL;
-        const char *hw_addr;
+        const char *name;
         res = g_ptr_array_new_with_free_func (g_free);
 
         /* Should not usually happen, but it can if something is holding on
          * to the sink. So guard against NULL being returned if the peer
          * object is not valid anymore. */
-        hw_addr = nm_wifi_p2p_peer_get_hw_address (sink->nm_peer);
-        if (hw_addr)
-          g_ptr_array_add (res, g_strdup (hw_addr));
+        name = nm_wifi_p2p_peer_get_name (sink->nm_peer);
+        if (name)
+          g_ptr_array_add (res, g_strdup (name));
 
         g_value_take_boxed (value, g_steal_pointer (&res));
         break;
@@ -219,10 +219,10 @@ nd_wfd_p2p_sink_finalize (GObject *object)
 {
   NdWFDP2PSink *sink = ND_WFD_P2P_SINK (object);
 
+  nd_wfd_p2p_sink_sink_stop_stream_int (sink);
+
   g_cancellable_cancel (sink->cancellable);
   g_clear_object (&sink->cancellable);
-
-  nd_wfd_p2p_sink_sink_stop_stream_int (sink);
 
   g_clear_object (&sink->nm_client);
   g_clear_object (&sink->nm_device);
@@ -472,6 +472,7 @@ firewall_ready (GObject      *source_object,
   connection = nm_simple_connection_new ();
 
   general_setting = nm_setting_connection_new ();
+  nm_setting_connection_add_permission ((NMSettingConnection *) general_setting, "user", g_get_user_name (), NULL);
   nm_connection_add_setting (connection, general_setting);
   g_object_set (general_setting, NM_SETTING_CONNECTION_ZONE, ND_WFD_ZONE, NULL);
 
@@ -488,7 +489,7 @@ firewall_ready (GObject      *source_object,
                 NULL);
 
   /* We do not need IPv6 */
-  ipv6_setting = nm_setting_ip4_config_new ();
+  ipv6_setting = nm_setting_ip6_config_new ();
   nm_connection_add_setting (connection, ipv6_setting);
   g_object_set (ipv6_setting,
                 NM_SETTING_IP_CONFIG_METHOD, NM_SETTING_IP6_CONFIG_METHOD_AUTO,
@@ -580,7 +581,7 @@ nd_wfd_p2p_sink_sink_stop_stream_int (NdWFDP2PSink *self)
    * nm_ac will be unset if something else destroyed the connection already */
   if (self->nm_ac)
     {
-      nm_device_disconnect (self->nm_device, NULL, NULL);
+      nm_device_disconnect_async (self->nm_device, NULL, NULL, NULL);
       g_clear_object (&self->nm_ac);
     }
 }
