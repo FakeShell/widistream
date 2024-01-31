@@ -4,6 +4,7 @@ gnome-network-displays (0.92.1-1) UNRELEASED; urgency=medium
     - Port to GTK4
     - Use libportal to acquire screencast portal
   * Updated my mail address in d/control and d/copyright
+  * Updated copyright years
 
  -- Matthias Geiger <werdahias@riseup.net>  Wed, 31 Jan 2024 22:14:33 +0100
 

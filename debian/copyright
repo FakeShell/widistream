@@ -4,8 +4,8 @@ Upstream-Name: gnome-network-displays
 Upstream-Contact: Benjamin Berg <bberg@redhat.com>
 
 Files: *
-Copyright: 2018-2022 Benjamin Berg <bberg@redhat.com>
-           2018-2022 The gnome-network-displays contributers
+Copyright: 2018-2024 Benjamin Berg <bberg@redhat.com>
+           2018-2024 The gnome-network-displays contributers
 License: GPL-3+
 
 Files: src/wfd/wfd-session-pool.c
@@ -14,15 +14,15 @@ Copyright: 2008 Wim Taymans <wim.taymans@gmail.com>
 License: GPL-3+
 
 Files: data/org.gnome.NetworkDisplays.appdata*
-Copyright: 2018-2022 Benjamin Berg <bberg@redhat.com>
+Copyright: 2018-2024 Benjamin Berg <bberg@redhat.com>
 License: CC0-1.0
 
 Files: data/icons/hicolor/scalable/apps/org.gnome.NetworkDisplays.svg
-Copyright: 2018-2022 GNOME Design Team
+Copyright: 2018-2024 GNOME Design Team
 License: CC-BY-SA-4.0
 
 Files: debian/*
-Copyright: 2022 Matthias Geiger <werdahias@riseup.net>
+Copyright: 2022-2024 Matthias Geiger <werdahias@riseup.net>
 License: GPL-3+
 
 License: GPL-3+
