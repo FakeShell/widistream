@@ -6,7 +6,8 @@ gnome-network-displays (0.92.1-1) UNRELEASED; urgency=medium
   * Updated my mail address in d/control and d/copyright
   * Updated copyright years
   * Updated build-dependencies for new upstream:
-    - build-depend on libadwaita, libgtk4, libportal-gtk4, libglib and desktop-file-utils
+    - build-depend on libadwaita, libgtk4, libportal-gtk4, libglib and
+      desktop-file-utils
     - versioned dependencies accordingly
     - dropped build-dependency on cmake
 
