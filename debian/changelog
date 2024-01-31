@@ -1,3 +1,11 @@
+gnome-network-displays (0.92.1-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+    - Port to GTK4
+    - Use libportal to acquire screencast portal
+
+ -- Matthias Geiger <werdahias@riseup.net>  Wed, 31 Jan 2024 22:14:33 +0100
+
 gnome-network-displays (0.91.0-1) unstable; urgency=medium
 
   * Team upload
