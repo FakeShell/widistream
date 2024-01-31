@@ -1,6 +1,6 @@
 project('gnome-network-displays', 'c',
-  version: '0.91.0',
-  meson_version: '>= 0.46.1',
+  version: '0.92.1',
+  meson_version: '>= 0.59.0',
 )
 
 gnome = import('gnome')
@@ -29,4 +29,7 @@ subdir('data')
 subdir('src')
 subdir('po')
 
-meson.add_install_script('build-aux/meson/postinstall.py')
+gnome.post_install(
+  gtk_update_icon_cache: true,
+  update_desktop_database: true,
+)

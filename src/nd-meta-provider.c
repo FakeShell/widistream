@@ -101,7 +101,7 @@ static void
 provider_sink_removed_cb (NdMetaProvider *meta_provider, NdSink *sink, NdProvider *provider)
 {
   g_autoptr(GPtrArray) sink_matches = NULL;
-  g_autoptr(NdMetaSink) meta_sink = NULL;
+  NdMetaSink *meta_sink = NULL;
   guint idx = 0;
 
   g_object_get (sink, "matches", &sink_matches, NULL);
@@ -111,10 +111,11 @@ provider_sink_removed_cb (NdMetaProvider *meta_provider, NdSink *sink, NdProvide
    * Note that we really need to search for it rather than doing
    * a faster lookup, as sink that is removed may not be reporting
    * its matches correctly anymore. */
-  g_assert (g_ptr_array_find_with_equal_func (meta_provider->sinks,
-                                              sink,
-                                              (GEqualFunc) nd_meta_sink_has_sink,
-                                              &idx));
+  if (!g_ptr_array_find_with_equal_func (meta_provider->sinks,
+                                         sink,
+                                         (GEqualFunc) nd_meta_sink_has_sink,
+                                         &idx))
+    return;
 
   meta_sink = g_object_ref (g_ptr_array_index (meta_provider->sinks, idx));
   g_assert (meta_sink != NULL);
