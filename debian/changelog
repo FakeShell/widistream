@@ -5,6 +5,10 @@ gnome-network-displays (0.92.1-1) UNRELEASED; urgency=medium
     - Use libportal to acquire screencast portal
   * Updated my mail address in d/control and d/copyright
   * Updated copyright years
+  * Updated build-dependencies for new upstream:
+    - build-depend on libadwaita, libgtk4, libportal-gtk4, libglib and desktop-file-utils
+    - versioned dependencies accordingly
+    - dropped build-dependency on cmake
 
  -- Matthias Geiger <werdahias@riseup.net>  Wed, 31 Jan 2024 22:14:33 +0100
 
