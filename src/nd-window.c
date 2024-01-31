@@ -19,31 +19,31 @@
 #include <avahi-gobject/ga-client.h>
 #include <avahi-gobject/ga-service-browser.h>
 #include <glib/gi18n.h>
+#include <gst/base/base.h>
+#include <gst/gst.h>
+#include <libportal-gtk4/portal-gtk4.h>
 #include "gnome-network-displays-config.h"
-#include "nd-window.h"
-#include "nd-sink-list.h"
-#include "nd-sink-row.h"
+#include "nd-cc-provider.h"
 #include "nd-codec-install.h"
+#include "nd-dummy-provider.h"
 #include "nd-meta-provider.h"
 #include "nd-nm-device-registry.h"
-#include "nd-dummy-provider.h"
-#include "nd-wfd-mice-provider.h"
-#include "nd-cc-provider.h"
-
-#include <gst/gst.h>
-
-#include "nd-screencast-portal.h"
 #include "nd-pulseaudio.h"
+#include "nd-sink-list-model.h"
+#include "nd-sink-row.h"
+#include "nd-wfd-mice-provider.h"
+#include "nd-window.h"
 
 struct _NdWindow
 {
-  GtkApplicationWindow parent_instance;
+  AdwApplicationWindow parent_instance;
 
   GaClient            *avahi_client;
   NdMetaProvider      *meta_provider;
   NdNMDeviceRegistry  *nm_device_registry;
 
-  NdScreencastPortal  *portal;
+  XdpPortal           *portal;
+  XdpSession          *session;
   gboolean             use_x11;
 
   NdPulseaudio        *pulse;
@@ -55,28 +55,74 @@ struct _NdWindow
   GPtrArray           *sink_property_bindings;
 
   /* Template widgets */
-  GtkStack   *has_providers_stack;
-  GtkStack   *step_stack;
-  NdSinkList *find_sink_list;
+  GtkStack        *has_providers_stack;
+  GtkStack        *step_stack;
 
-  GtkListBox *connect_sink_list;
-  GtkLabel   *connect_state_label;
-  GtkButton  *connect_cancel;
+  GtkListBox      *find_sink_list;
+  NdSinkListModel *find_sink_list_model;
 
-  GtkListBox *stream_sink_list;
-  GtkLabel   *stream_state_label;
-  GtkBox     *stream_video_install;
-  GtkBox     *stream_audio_install;
-  GtkButton  *stream_cancel;
+  GtkListBox      *connect_sink_list;
+  GListStore      *connect_sink_list_model;
 
-  GtkListBox *error_sink_list;
-  GtkBox     *error_video_install;
-  GtkBox     *error_audio_install;
-  GtkBox     *error_firewall_zone;
-  GtkButton  *error_return;
+  GtkLabel        *connect_state_label;
+  GtkButton       *connect_cancel;
+
+  GtkListBox      *stream_sink_list;
+  GListStore      *stream_sink_list_model;
+
+  GtkLabel        *stream_state_label;
+  GtkButton       *stream_cancel;
+
+  NdCodecInstall  *codec_install_video;
+  NdCodecInstall  *codec_install_audio;
+
+  GtkListBox      *error_sink_list;
+  GListStore      *error_sink_list_model;
+  GtkBox          *error_firewall_zone;
+  GtkButton       *error_return;
 };
 
-G_DEFINE_TYPE (NdWindow, gnome_nd_window, GTK_TYPE_APPLICATION_WINDOW)
+G_DEFINE_TYPE (NdWindow, gnome_nd_window, ADW_TYPE_APPLICATION_WINDOW)
+
+static GstElement *
+nd_window_screencast_get_source (NdWindow * self)
+{
+  g_autoptr(GstElement) src = NULL;
+  GVariant *streams = NULL;
+  const gchar *stream_type;
+  gsize stream_count;
+  guint32 node_id;
+
+  src = gst_element_factory_make ("pipewiresrc", "portal-pipewire-source");
+  if (src == NULL)
+    g_error ("GStreamer element \"pipewiresrc\" could not be created!");
+
+  streams = xdp_session_get_streams (self->session);
+  if (streams == NULL)
+    g_error ("XDP session streams not found!");
+
+  stream_type = g_variant_get_type_string (streams);
+  if (0 != strcmp (stream_type, "a(ua{sv})"))
+    g_error ("Unexpected XDP session type '%s'", stream_type);
+
+  stream_count = g_variant_n_children (streams);
+  if (stream_count == 0)
+    g_error ("Did not find any usable streams!");
+
+  g_variant_get_child (streams, 0, "(ua{sv})", &node_id, NULL);
+
+  g_debug ("Got a stream with node ID: %d", node_id);
+
+  g_object_set (src,
+                "fd", xdp_session_open_pipewire_remote (self->session),
+                "path", g_strdup_printf ("%u", node_id),
+                "do-timestamp", TRUE,
+                NULL);
+  
+  gst_base_src_set_live (GST_BASE_SRC (src), TRUE);
+
+  return g_steal_pointer (&src);
+}
 
 static GstElement *
 sink_create_source_cb (NdWindow * self, NdSink * sink)
@@ -89,7 +135,7 @@ sink_create_source_cb (NdWindow * self, NdSink * sink)
   if (self->use_x11)
     src = gst_element_factory_make ("ximagesrc", "X11 screencast source");
   else
-    src = nd_screencast_portal_get_source (self->portal);
+    src = nd_window_screencast_get_source (self);
 
   if (!src)
     g_error ("Error creating video source element, likely a missing dependency!");
@@ -140,14 +186,6 @@ sink_create_audio_source_cb (NdWindow * self, NdSink * sink)
 }
 
 static void
-remove_widget (GtkWidget *widget, gpointer user_data)
-{
-  GtkContainer *container = GTK_CONTAINER (user_data);
-
-  gtk_container_remove (container, widget);
-}
-
-static void
 sink_notify_state_cb (NdWindow *self, GParamSpec *pspec, NdSink *sink)
 {
   NdSinkState state;
@@ -187,29 +225,29 @@ sink_notify_state_cb (NdWindow *self, GParamSpec *pspec, NdSink *sink)
       break;
 
     case ND_SINK_STATE_STREAMING:
-      gtk_container_foreach (GTK_CONTAINER (self->connect_sink_list), remove_widget, self->connect_sink_list);
-      gtk_container_foreach (GTK_CONTAINER (self->stream_sink_list), remove_widget, self->stream_sink_list);
-      gtk_container_foreach (GTK_CONTAINER (self->error_sink_list), remove_widget, self->error_sink_list);
-      gtk_container_add (GTK_CONTAINER (self->stream_sink_list),
-                         GTK_WIDGET (nd_sink_row_new (self->stream_sink)));
+      g_list_store_remove_all (self->connect_sink_list_model);
+      g_list_store_remove_all (self->stream_sink_list_model);
+      g_list_store_remove_all (self->error_sink_list_model);
+
+      g_list_store_append (self->stream_sink_list_model, self->stream_sink);
 
       gtk_stack_set_visible_child_name (self->step_stack, "stream");
       break;
 
     case ND_SINK_STATE_ERROR:
-      gtk_container_foreach (GTK_CONTAINER (self->stream_sink_list), remove_widget, self->stream_sink_list);
-      gtk_container_foreach (GTK_CONTAINER (self->connect_sink_list), remove_widget, self->connect_sink_list);
-      gtk_container_foreach (GTK_CONTAINER (self->error_sink_list), remove_widget, self->error_sink_list);
-      gtk_container_add (GTK_CONTAINER (self->error_sink_list),
-                         GTK_WIDGET (nd_sink_row_new (self->stream_sink)));
+      g_list_store_remove_all (self->connect_sink_list_model);
+      g_list_store_remove_all (self->stream_sink_list_model);
+      g_list_store_remove_all (self->error_sink_list_model);
+
+      g_list_store_append (self->error_sink_list_model, self->stream_sink);
 
       gtk_stack_set_visible_child_name (self->step_stack, "error");
       break;
 
     case ND_SINK_STATE_DISCONNECTED:
-      gtk_container_foreach (GTK_CONTAINER (self->stream_sink_list), remove_widget, self->stream_sink_list);
-      gtk_container_foreach (GTK_CONTAINER (self->connect_sink_list), remove_widget, self->connect_sink_list);
-      gtk_container_foreach (GTK_CONTAINER (self->error_sink_list), remove_widget, self->error_sink_list);
+      g_list_store_remove_all (self->connect_sink_list_model);
+      g_list_store_remove_all (self->stream_sink_list_model);
+      g_list_store_remove_all (self->error_sink_list_model);
 
       gtk_stack_set_visible_child_name (self->step_stack, "find");
       g_object_set (self->meta_provider, "discover", TRUE, NULL);
@@ -234,7 +272,7 @@ transform_str_is_set_to_bool (GBinding     *binding,
 }
 
 static void
-find_sink_list_row_activated_cb (NdWindow *self, NdSinkRow *row, NdSinkList *sink_list)
+find_sink_list_row_activated_cb (NdWindow *self, NdSinkRow *row, GtkListBox *sink_list)
 {
   NdSink *sink;
 
@@ -279,28 +317,14 @@ find_sink_list_row_activated_cb (NdWindow *self, NdSinkRow *row, NdSinkList *sin
   g_ptr_array_add (self->sink_property_bindings,
                    g_object_ref (g_object_bind_property (self->stream_sink,
                                                          "missing-video-codec",
-                                                         self->stream_video_install,
+                                                         self->codec_install_video,
                                                          "codecs",
                                                          G_BINDING_SYNC_CREATE)));
 
   g_ptr_array_add (self->sink_property_bindings,
                    g_object_ref (g_object_bind_property (self->stream_sink,
                                                          "missing-audio-codec",
-                                                         self->stream_audio_install,
-                                                         "codecs",
-                                                         G_BINDING_SYNC_CREATE)));
-
-  g_ptr_array_add (self->sink_property_bindings,
-                   g_object_ref (g_object_bind_property (self->stream_sink,
-                                                         "missing-video-codec",
-                                                         self->error_video_install,
-                                                         "codecs",
-                                                         G_BINDING_SYNC_CREATE)));
-
-  g_ptr_array_add (self->sink_property_bindings,
-                   g_object_ref (g_object_bind_property (self->stream_sink,
-                                                         "missing-audio-codec",
-                                                         self->error_audio_install,
+                                                         self->codec_install_audio,
                                                          "codecs",
                                                          G_BINDING_SYNC_CREATE)));
 
@@ -316,13 +340,14 @@ find_sink_list_row_activated_cb (NdWindow *self, NdSinkRow *row, NdSinkList *sin
                                                               NULL)));
 
   g_object_set (self->meta_provider, "discover", FALSE, NULL);
-  gtk_container_add (GTK_CONTAINER (self->connect_sink_list),
-                     GTK_WIDGET (nd_sink_row_new (self->stream_sink)));
+  g_list_store_append (self->connect_sink_list_model, self->stream_sink);
 }
 
 static void
 gnome_nd_window_constructed (GObject *obj)
 {
+  G_OBJECT_CLASS (gnome_nd_window_parent_class)->constructed (obj);
+
   g_autoptr(GError) error = NULL;
   g_autoptr(NdWFDMiceProvider) mice_provider = NULL;
   g_autoptr(NdCCProvider) cc_provider = NULL;
@@ -330,7 +355,6 @@ gnome_nd_window_constructed (GObject *obj)
 
   self->cancellable = g_cancellable_new ();
   self->avahi_client = ga_client_new (GA_CLIENT_FLAG_NO_FLAGS);
-
 
   if (!ga_client_start (self->avahi_client, &error))
     {
@@ -354,6 +378,14 @@ gnome_nd_window_constructed (GObject *obj)
   g_debug ("NdWindow: Got avahi browser");
   nd_meta_provider_add_provider (self->meta_provider, ND_PROVIDER (mice_provider));
   nd_meta_provider_add_provider (self->meta_provider, ND_PROVIDER (cc_provider));
+  if (g_strcmp0 (g_getenv ("NETWORK_DISPLAYS_DUMMY"), "1") == 0)
+    {
+      g_autoptr(NdDummyProvider) dummy_provider = NULL;
+
+      g_debug ("Adding dummy provider");
+      dummy_provider = nd_dummy_provider_new ();
+      nd_meta_provider_add_provider (self->meta_provider, ND_PROVIDER (dummy_provider));
+    }
 }
 
 static void
@@ -398,10 +430,9 @@ gnome_nd_window_class_init (NdWindowClass *klass)
   object_class->finalize = gnome_nd_window_finalize;
   object_class->dispose = gnome_nd_window_dispose;
 
-  ND_TYPE_SINK_LIST;
   ND_TYPE_CODEC_INSTALL;
 
-  gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/screencast/nd-window.ui");
+  gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/NetworkDisplays/nd-window.ui");
   gtk_widget_class_bind_template_child (widget_class, NdWindow, has_providers_stack);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, step_stack);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, find_sink_list);
@@ -410,32 +441,29 @@ gnome_nd_window_class_init (NdWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, NdWindow, connect_cancel);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, stream_sink_list);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, stream_state_label);
-  gtk_widget_class_bind_template_child (widget_class, NdWindow, stream_video_install);
-  gtk_widget_class_bind_template_child (widget_class, NdWindow, stream_audio_install);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, codec_install_audio);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, codec_install_video);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, stream_cancel);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, error_sink_list);
-  gtk_widget_class_bind_template_child (widget_class, NdWindow, error_video_install);
-  gtk_widget_class_bind_template_child (widget_class, NdWindow, error_audio_install);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, error_firewall_zone);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, error_return);
 }
 
 static void
-nd_screencast_portal_init_async_cb (GObject      *source_object,
-                                    GAsyncResult *res,
-                                    gpointer      user_data)
+nd_screencast_started_cb (GObject      *source_object,
+                          GAsyncResult *result,
+                          gpointer      user_data)
 {
-  NdWindow *window;
-
   g_autoptr(GError) error = NULL;
+  XdpSession *session = (XdpSession *) source_object;
+  NdWindow *window = ND_WINDOW (user_data);
 
-  if (!g_async_initable_init_finish (G_ASYNC_INITABLE (source_object), res, &error))
+  window->session = session;
+  if (!xdp_session_start_finish (window->session, result, &error))
     {
       if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
         {
           g_warning ("Error initializing screencast portal: %s", error->message);
-
-          window = ND_WINDOW (user_data);
 
           /* Unknown method means the portal does not exist, give a slightly
            * more specific warning then.
@@ -447,12 +475,35 @@ nd_screencast_portal_init_async_cb (GObject      *source_object,
           window->use_x11 = TRUE;
         }
 
-      g_object_unref (source_object);
+      g_warning ("Failed to start screencast session: %s", error->message);
+      g_clear_object (&window->session);
+      return;
+    }
+  g_debug ("Created screencast session");
+}
+
+static void
+nd_screencast_init_cb (GObject      *source_object,
+                       GAsyncResult *result,
+                       gpointer      user_data)
+{
+  g_autoptr(GError) error = NULL;
+  XdpPortal *portal = XDP_PORTAL (source_object);
+  NdWindow *window = ND_WINDOW (user_data);
+  XdpParent *parent = NULL;
+
+  window->portal = portal;
+  window->session = xdp_portal_create_screencast_session_finish (window->portal, result, &error);
+  if (window->session == NULL)
+    {
+      g_warning ("Failed to create screencast session: %s", error->message);
+      window->use_x11 = TRUE;
       return;
     }
 
-  window = ND_WINDOW (user_data);
-  window->portal = ND_SCREENCAST_PORTAL (source_object);
+  parent = xdp_parent_new_gtk (GTK_WINDOW (window));
+  xdp_session_start (window->session, parent, NULL, nd_screencast_started_cb, window);
+  xdp_parent_free (parent);
 }
 
 static void
@@ -501,7 +552,7 @@ on_meta_provider_has_provider_changed_cb (NdWindow *self, GParamSpec *pspec, NdM
 static void
 gnome_nd_window_init (NdWindow *self)
 {
-  NdScreencastPortal *portal;
+  g_autoptr(GError) error = NULL;
   NdPulseaudio *pulse;
 
   gtk_widget_init_template (GTK_WIDGET (self));
@@ -514,16 +565,32 @@ gnome_nd_window_init (NdWindow *self)
                            G_CONNECT_SWAPPED);
 
   self->nm_device_registry = nd_nm_device_registry_new (self->meta_provider);
-  nd_sink_list_set_provider (self->find_sink_list, ND_PROVIDER (self->meta_provider));
 
-  if (g_strcmp0 (g_getenv ("NETWORK_DISPLAYS_DUMMY"), "1") == 0)
-    {
-      g_autoptr(NdDummyProvider) dummy_provider = NULL;
+  self->connect_sink_list_model = g_list_store_new (ND_TYPE_SINK);
+  self->stream_sink_list_model = g_list_store_new (ND_TYPE_SINK);
+  self->error_sink_list_model = g_list_store_new (ND_TYPE_SINK);
+  self->find_sink_list_model = nd_sink_list_model_new (ND_PROVIDER (self->meta_provider));
 
-      g_debug ("Adding dummy provider");
-      dummy_provider = nd_dummy_provider_new ();
-      nd_meta_provider_add_provider (self->meta_provider, ND_PROVIDER (dummy_provider));
-    }
+  gtk_list_box_bind_model (self->connect_sink_list,
+                           G_LIST_MODEL (self->connect_sink_list_model),
+                           (GtkListBoxCreateWidgetFunc) nd_sink_row_new,
+                           NULL,
+                           NULL);
+  gtk_list_box_bind_model (self->stream_sink_list,
+                           G_LIST_MODEL (self->stream_sink_list_model),
+                           (GtkListBoxCreateWidgetFunc) nd_sink_row_new,
+                           NULL,
+                           NULL);
+  gtk_list_box_bind_model (self->error_sink_list,
+                           G_LIST_MODEL (self->error_sink_list_model),
+                           (GtkListBoxCreateWidgetFunc) nd_sink_row_new,
+                           NULL,
+                           NULL);
+  gtk_list_box_bind_model (self->find_sink_list,
+                           G_LIST_MODEL (self->find_sink_list_model),
+                           (GtkListBoxCreateWidgetFunc) nd_sink_row_new,
+                           NULL,
+                           NULL);
 
   g_signal_connect_object (self->find_sink_list,
                            "row-activated",
@@ -553,12 +620,24 @@ gnome_nd_window_init (NdWindow *self)
                            self,
                            G_CONNECT_SWAPPED);
 
-  portal = nd_screencast_portal_new ();
-  g_async_initable_init_async (G_ASYNC_INITABLE (portal),
-                               G_PRIORITY_LOW,
-                               self->cancellable,
-                               nd_screencast_portal_init_async_cb,
-                               self);
+  self->portal = xdp_portal_initable_new (&error);
+  if (error)
+    {
+      g_warning ("Failed to create screencast portal: %s", error->message);
+      self->use_x11 = TRUE;
+      g_clear_object (&self->portal);
+    }
+
+  if (self->portal)
+    xdp_portal_create_screencast_session (self->portal,
+                                          XDP_OUTPUT_MONITOR | XDP_OUTPUT_VIRTUAL,
+                                          XDP_SCREENCAST_FLAG_NONE,
+                                          XDP_CURSOR_MODE_EMBEDDED,
+                                          XDP_PERSIST_MODE_NONE,
+                                          NULL,
+                                          self->cancellable,
+                                          nd_screencast_init_cb,
+                                          self);
 
   pulse = nd_pulseaudio_new ();
   g_async_initable_init_async (G_ASYNC_INITABLE (pulse),

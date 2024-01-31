@@ -16,11 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "gnome-network-displays-config.h"
-#include "nd-wfd-mice-sink.h"
 #include "wfd/wfd-client.h"
 #include "wfd/wfd-media-factory.h"
 #include "wfd/wfd-server.h"
+#include "gnome-network-displays-config.h"
+#include "nd-wfd-mice-sink.h"
 
 struct _NdWFDMiceSink
 {
@@ -30,12 +30,13 @@ struct _NdWFDMiceSink
 
   GCancellable      *cancellable;
 
-  GStrv              missing_video_codec;
-  GStrv              missing_audio_codec;
+  GtkStringList     *missing_video_codec;
+  GtkStringList     *missing_audio_codec;
   char              *missing_firewall_zone;
 
-  gchar             *remote_address;
-  gchar             *remote_name;
+  gchar             *name;
+  gchar             *ip;
+  gchar             *p2p_mac;
 
   GSocketClient     *signalling_client;
   GSocketConnection *signalling_client_conn;
@@ -47,8 +48,8 @@ struct _NdWFDMiceSink
 enum {
   PROP_CLIENT = 1,
   PROP_NAME,
-  PROP_ADDRESS,
-
+  PROP_IP,
+  PROP_P2P_MAC,
   PROP_DISPLAY_NAME,
   PROP_MATCHES,
   PROP_PRIORITY,
@@ -111,11 +112,15 @@ nd_wfd_mice_sink_get_property (GObject    *object,
       break;
 
     case PROP_NAME:
-      g_value_set_string (value, sink->remote_name);
+      g_value_set_string (value, sink->name);
       break;
 
-    case PROP_ADDRESS:
-      g_value_set_string (value, sink->remote_address);
+    case PROP_IP:
+      g_value_set_string (value, sink->ip);
+      break;
+
+    case PROP_P2P_MAC:
+      g_value_set_string (value, sink->p2p_mac);
       break;
 
     case PROP_DISPLAY_NAME:
@@ -127,9 +132,17 @@ nd_wfd_mice_sink_get_property (GObject    *object,
         g_autoptr(GPtrArray) res = NULL;
         res = g_ptr_array_new_with_free_func (g_free);
 
-        if (sink->remote_name)
-          g_ptr_array_add (res, g_strdup (sink->remote_name));
-
+        if (sink->ip)
+          {
+            g_debug ("NdWFDMiceSink: Adding IP %s to match list", sink->ip);
+            g_ptr_array_add (res, g_strdup (sink->ip));
+          }
+        if (sink->p2p_mac)
+          {
+            gchar *p2p_mac = g_utf8_strup (sink->p2p_mac, -1);
+            g_debug ("NdWFDMiceSink: Adding P2P MAC %s to match list", p2p_mac);
+            g_ptr_array_add (res, p2p_mac);
+          }
         g_value_take_boxed (value, g_steal_pointer (&res));
         break;
       }
@@ -143,11 +156,11 @@ nd_wfd_mice_sink_get_property (GObject    *object,
       break;
 
     case PROP_MISSING_VIDEO_CODEC:
-      g_value_set_boxed (value, sink->missing_video_codec);
+      g_value_set_object (value, sink->missing_video_codec);
       break;
 
     case PROP_MISSING_AUDIO_CODEC:
-      g_value_set_boxed (value, sink->missing_audio_codec);
+      g_value_set_object (value, sink->missing_audio_codec);
       break;
 
     case PROP_MISSING_FIREWALL_ZONE:
@@ -176,13 +189,18 @@ nd_wfd_mice_sink_set_property (GObject      *object,
       break;
 
     case PROP_NAME:
-      sink->remote_name = g_value_dup_string (value);
+      sink->name = g_value_dup_string (value);
       g_object_notify (G_OBJECT (sink), "display-name");
       break;
 
-    case PROP_ADDRESS:
-      g_assert (sink->remote_address == NULL);
-      sink->remote_address = g_value_dup_string (value);
+    case PROP_IP:
+      g_assert (sink->ip == NULL);
+      sink->ip = g_value_dup_string (value);
+      break;
+
+    case PROP_P2P_MAC:
+      g_assert (sink->p2p_mac == NULL);
+      sink->p2p_mac = g_value_dup_string (value);
       break;
 
     default:
@@ -204,8 +222,8 @@ nd_wfd_mice_sink_finalize (GObject *object)
   g_clear_object (&sink->cancellable);
   g_clear_object (&sink->signalling_client);
 
-  g_clear_pointer (&sink->missing_video_codec, g_strfreev);
-  g_clear_pointer (&sink->missing_audio_codec, g_strfreev);
+  g_clear_object (&sink->missing_video_codec);
+  g_clear_object (&sink->missing_audio_codec);
   g_clear_pointer (&sink->missing_firewall_zone, g_free);
 
   G_OBJECT_CLASS (nd_wfd_mice_sink_parent_class)->finalize (object);
@@ -232,9 +250,15 @@ nd_wfd_mice_sink_class_init (NdWFDMiceSinkClass *klass)
                          NULL,
                          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
 
-  props[PROP_ADDRESS] =
-    g_param_spec_string ("address", "Sink Address",
-                         "The address the sink was found on.",
+  props[PROP_IP] =
+    g_param_spec_string ("ip", "Sink IP Address",
+                         "The IP address the sink was found on.",
+                         NULL,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
+
+  props[PROP_P2P_MAC] =
+    g_param_spec_string ("p2p-mac", "Sink P2P MAC Address",
+                         "The P2P MAC address the sink was found on.",
                          NULL,
                          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
 
@@ -292,7 +316,7 @@ signalling_client_send (NdWFDMiceSink * self,
   if (self->signalling_client_conn == NULL)
     {
       self->signalling_client_conn = g_socket_client_connect_to_host (self->signalling_client,
-                                                                      (gchar *) self->remote_address,
+                                                                      (gchar *) self->ip,
                                                                       7250,
                                                                       NULL,
                                                                       &error);
@@ -414,29 +438,26 @@ nd_wfd_mice_sink_sink_start_stream (NdSink *sink)
 
   have_basic_codecs = wfd_get_missing_codecs (&missing_video, &missing_audio);
 
-  g_clear_pointer (&self->missing_video_codec, g_strfreev);
-  g_clear_pointer (&self->missing_audio_codec, g_strfreev);
+  g_clear_object (&self->missing_video_codec);
+  g_clear_object (&self->missing_audio_codec);
 
-  self->missing_video_codec = g_strdupv (missing_video);
-  self->missing_audio_codec = g_strdupv (missing_audio);
+  self->missing_video_codec = gtk_string_list_new ((const char *const *) missing_video);
+  self->missing_audio_codec = gtk_string_list_new ((const char *const *) missing_audio);
 
   g_object_notify (G_OBJECT (self), "missing-video-codec");
   g_object_notify (G_OBJECT (self), "missing-audio-codec");
 
   if (!have_basic_codecs)
     {
-      g_warning ("Essential codecs are missing!");
-      self->state = ND_SINK_STATE_ERROR;
-      g_object_notify (G_OBJECT (self), "state");
-
-      return g_object_ref (sink);
+      g_warning ("NdWFDMiceSink: Essential codecs are missing!");
+      goto fail;
     }
 
   g_assert (self->server == NULL);
   self->server = wfd_server_new ();
   self->server_source_id = gst_rtsp_server_attach (GST_RTSP_SERVER (self->server), NULL);
 
-  if (self->server_source_id == 0 || self->remote_address == NULL)
+  if (self->server_source_id == 0 || self->ip == NULL)
     goto fail;
 
   g_signal_connect_object (self->server,
@@ -587,11 +608,13 @@ nd_wfd_mice_sink_sink_stop_stream (NdSink *sink)
 
 NdWFDMiceSink *
 nd_wfd_mice_sink_new (gchar *name,
-                      gchar *remote_address)
+                      gchar *ip,
+                      gchar *p2p_mac)
 {
   return g_object_new (ND_TYPE_WFD_MICE_SINK,
                        "name", name,
-                       "address", remote_address,
+                       "ip", ip,
+                       "p2p-mac", p2p_mac,
                        NULL);
 }
 
