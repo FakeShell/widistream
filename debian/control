@@ -4,7 +4,8 @@ Priority: optional
 Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
 Uploaders: Matthias Geiger <werdahias@riseup.net>
 Rules-Requires-Root: no
-Build-Depends: debhelper-compat (= 13),
+Build-Depends: appstream,
+               debhelper-compat (= 13),
                desktop-file-utils,
                libadwaita-1-dev (>= 1.0.0),
                libavahi-client-dev,
