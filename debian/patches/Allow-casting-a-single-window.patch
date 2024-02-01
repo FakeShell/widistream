@@ -1,0 +1,22 @@
+From: Christian Glombek <lorbus@fedoraproject.org>
+Date: Mon, 29 Jan 2024 23:52:06 +0100
+Subject: Allow casting a single window
+
+Add XDP_OUTPUT_WINDOW to the XDP screencast session output types, allowing the portal to choose a window as source.
+---
+ src/nd-window.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/nd-window.c b/src/nd-window.c
+index 9d9af3a..0f17490 100644
+--- a/src/nd-window.c
++++ b/src/nd-window.c
+@@ -630,7 +630,7 @@ gnome_nd_window_init (NdWindow *self)
+ 
+   if (self->portal)
+     xdp_portal_create_screencast_session (self->portal,
+-                                          XDP_OUTPUT_MONITOR | XDP_OUTPUT_VIRTUAL,
++                                          XDP_OUTPUT_MONITOR | XDP_OUTPUT_WINDOW | XDP_OUTPUT_VIRTUAL,
+                                           XDP_SCREENCAST_FLAG_NONE,
+                                           XDP_CURSOR_MODE_EMBEDDED,
+                                           XDP_PERSIST_MODE_NONE,
