@@ -1,2 +1,4 @@
 version=4
-https://gitlab.gnome.org/GNOME/gnome-network-displays/tags?sort=updated_desc archive/v?\d[\d.]+/gnome-network-displays-v?([\d.]+)@ARCHIVE_EXT@
+opts="searchmode=plain" \
+https://gitlab.gnome.org/GNOME/@PACKAGE@/tags?sort=updated_desc \
+	-/archive/[\d.]+/@PACKAGE@@ANY_VERSION@@ARCHIVE_EXT@
