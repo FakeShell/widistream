@@ -49,11 +49,11 @@ cc_ctrl_send_auth (CcCtrl *ctrl)
 static gboolean
 cc_ctrl_send_connect (CcCtrl *ctrl, gchar *destination_id)
 {
-#ifdef __aarch64__    
+#ifdef __aarch64__
   gchar *platform = "Wayland; Linux aarch64";
 #else
   gchar *platform = "Wayland; Linux x86_64";
-#endif    
+#endif
   gchar *json = cc_json_helper_build_string (
     "type", CC_JSON_TYPE_STRING, "CONNECT",
     "userAgent", CC_JSON_TYPE_STRING, g_strdup_printf ("GND/%s (%s)", PACKAGE_VERSION, platform),
@@ -214,9 +214,15 @@ cc_ctrl_send_close_app (CcCtrl *ctrl, gchar *sessionId)
 static gboolean
 cc_ctrl_send_load (CcCtrl *ctrl, gchar *sessionId)
 {
+  guint port;
+  CcMediaFactory *factory;
+
+  g_object_get (ctrl->http_server, "port", &port, NULL);
+  factory = (CcMediaFactory *) ctrl->http_server;
+
   GArray *tracks = g_array_new (FALSE, FALSE, sizeof (JsonNode *));
   JsonNode *track_node = cc_json_helper_build_node (
-    "trackContentType", CC_JSON_TYPE_STRING, "video/mp2t",
+    "trackContentType", CC_JSON_TYPE_STRING, content_types[cc_media_factory_profiles[factory->factory_profile].muxer],
     "trackId", CC_JSON_TYPE_INT, 1,
     "type", CC_JSON_TYPE_STRING, "VIDEO",
     NULL);
@@ -228,9 +234,9 @@ cc_ctrl_send_load (CcCtrl *ctrl, gchar *sessionId)
     "media", CC_JSON_TYPE_OBJECT, cc_json_helper_build_node (
       "contentUrl", CC_JSON_TYPE_STRING, g_strdup_printf ("http://%s:%d/",
                                                           ctrl->comm.local_address,
-                                                          cc_http_server_get_port (ctrl->http_server)),
+                                                          port),
       "streamType", CC_JSON_TYPE_STRING, "LIVE",
-      "contentType", CC_JSON_TYPE_STRING, "video/x-matroska",
+      "contentType", CC_JSON_TYPE_STRING, content_types[cc_media_factory_profiles[factory->factory_profile].muxer],
       NULL),
     "requestId", CC_JSON_TYPE_INT, ctrl->request_id++,
     NULL);

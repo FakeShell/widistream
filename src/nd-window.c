@@ -118,7 +118,7 @@ nd_window_screencast_get_source (NdWindow * self)
                 "path", g_strdup_printf ("%u", node_id),
                 "do-timestamp", TRUE,
                 NULL);
-  
+
   gst_base_src_set_live (GST_BASE_SRC (src), TRUE);
 
   return g_steal_pointer (&src);
@@ -630,7 +630,7 @@ gnome_nd_window_init (NdWindow *self)
 
   if (self->portal)
     xdp_portal_create_screencast_session (self->portal,
-                                          XDP_OUTPUT_MONITOR | XDP_OUTPUT_VIRTUAL,
+                                          XDP_OUTPUT_MONITOR | XDP_OUTPUT_WINDOW | XDP_OUTPUT_VIRTUAL,
                                           XDP_SCREENCAST_FLAG_NONE,
                                           XDP_CURSOR_MODE_EMBEDDED,
                                           XDP_PERSIST_MODE_NONE,
