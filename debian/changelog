@@ -1,3 +1,9 @@
+gnome-network-displays (0.93.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Matthias Geiger <werdahias@debian.org>  Wed, 14 Aug 2024 23:11:54 +0200
+
 gnome-network-displays (0.92.2-2) unstable; urgency=medium
 
   * Depend on iwd or wpasupplicant (Closes: #1077980)
