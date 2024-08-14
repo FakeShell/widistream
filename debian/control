@@ -2,7 +2,7 @@ Source: gnome-network-displays
 Section: gnome
 Priority: optional
 Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
-Uploaders: Matthias Geiger <werdahias@riseup.net>
+Uploaders: Matthias Geiger <werdahias@debian.org>
 Rules-Requires-Root: no
 Build-Depends: appstream,
                debhelper-compat (= 13),
