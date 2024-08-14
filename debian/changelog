@@ -1,8 +1,10 @@
-gnome-network-displays (0.93.0-1) UNRELEASED; urgency=medium
+gnome-network-displays (0.93.0-1) unstable; urgency=medium
 
   * New upstream release
+  * Bump Standards-Version to 4.7.0; no changes needed
+  * Updated my mail address in d/control, d/copyright
 
- -- Matthias Geiger <werdahias@debian.org>  Wed, 14 Aug 2024 23:11:54 +0200
+ -- Matthias Geiger <werdahias@debian.org>  Wed, 14 Aug 2024 23:31:03 +0200
 
 gnome-network-displays (0.92.2-2) unstable; urgency=medium
 
