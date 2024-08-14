@@ -5,6 +5,7 @@
 static const gchar * wfd_gst_elements[ELEMENT_NONE + 1] = {
   [ELEMENT_OPENH264] = "openh264enc",
   [ELEMENT_X264] = "x264enc",
+  [ELEMENT_VAH264] = "vah264enc",
   [ELEMENT_VAAPIH264] = "vaapih264enc",
   [ELEMENT_VIDEO_NONE] = NULL,
 
@@ -126,7 +127,7 @@ wfd_media_factory_create_video_element (WfdMediaFactory *self, GstBin *bin)
   QOSData *qos_data;
 
   GstElement *scale;
-  GstElement *sizefilter;
+  GstElement *sinkfilter;
   GstElement *convert;
   GstElement *queue_pre_encoder;
   GstElement *encoder;
@@ -154,9 +155,9 @@ wfd_media_factory_create_video_element (WfdMediaFactory *self, GstBin *bin)
                               "width", G_TYPE_INT, 1920,
                               "height", G_TYPE_INT, 1080,
                               NULL);
-  sizefilter = gst_element_factory_make ("capsfilter", "wfd-sizefilter");
-  success &= gst_bin_add (bin, sizefilter);
-  g_object_set (sizefilter,
+  sinkfilter = gst_element_factory_make ("capsfilter", "wfd-sinkfilter");
+  success &= gst_bin_add (bin, sinkfilter);
+  g_object_set (sinkfilter,
                 "caps", caps,
                 NULL);
   g_clear_pointer (&caps, gst_caps_unref);
@@ -209,6 +210,20 @@ wfd_media_factory_create_video_element (WfdMediaFactory *self, GstBin *bin)
       success &= gst_bin_add (bin, encoder);
 
       gst_preset_load_preset (GST_PRESET (encoder), "Profile Baseline");
+      break;
+
+    case ELEMENT_VAH264:
+      encoder = gst_element_factory_make ("vah264enc", "wfd-encoder");
+      encoder_elem = encoder;
+      success &= gst_bin_add (bin, encoder);
+      g_object_set (encoder,
+                    "qos", TRUE,
+                    "key-int-max", 30,
+                    "num-slices", 1,
+                    "cabac", FALSE,
+                    "dct8x8", FALSE,
+                    NULL);
+
       break;
 
     case ELEMENT_VAAPIH264:
@@ -297,7 +312,7 @@ wfd_media_factory_create_video_element (WfdMediaFactory *self, GstBin *bin)
 
   success &= gst_element_link_many (source,
                                     scale,
-                                    sizefilter,
+                                    sinkfilter,
                                     convert,
                                     queue_pre_encoder,
                                     encoder,
@@ -419,7 +434,7 @@ wfd_media_factory_create_element (GstRTSPMediaFactory *factory, const GstRTSPUrl
   GstElement *payloader;
   gboolean success = TRUE;
 
-  bin = GST_BIN (gst_bin_new ("wfd-encoder-bin"));
+  bin = GST_BIN (gst_bin_new ("nd-wfd-pipeline"));
 
   queue_mpegmux_video = wfd_media_factory_create_video_element (self, bin);
 
@@ -469,7 +484,7 @@ wfd_media_factory_create_element (GstRTSPMediaFactory *factory, const GstRTSPUrl
 
   GST_DEBUG_BIN_TO_DOT_FILE (bin,
                              GST_DEBUG_GRAPH_SHOW_MEDIA_TYPE,
-                             "wfd-encoder-bin");
+                             "nd-wfd-pipeline");
   if (!success)
     {
       g_error ("WfdMediaFactory: Error creating encoding pipeline. If gstreamer is compiled with debugging and GST_DEBUG_DUMP_DOT_DIR is set, then the pipeline will have been dumped.");
@@ -497,9 +512,9 @@ wfd_media_factory_create_pipeline (GstRTSPMediaFactory *factory, GstRTSPMedia *m
 WfdMediaQuirks
 wfd_configure_media_element (GstBin *bin, WfdParams *params)
 {
-  g_autoptr(GstCaps) caps_sizefilter = NULL;
-  g_autoptr(GstElement) sizefilter = NULL;
-  g_autoptr(GstCaps) caps_codecfilter = NULL;
+  g_autoptr(GstCaps) caps = NULL;
+  g_autoptr(GstElement) srcfilter = NULL;
+  g_autoptr(GstElement) sinkfilter = NULL;
   g_autoptr(GstElement) codecfilter = NULL;
   g_autoptr(GstElement) encoder = NULL;
   g_autoptr(GstElement) audio_pipeline = NULL;
@@ -532,16 +547,32 @@ wfd_configure_media_element (GstBin *bin, WfdParams *params)
   if (params->idr_request_capability && !(quirks & WFD_QUIRK_NO_IDR))
     gop_size = 10 * resolution->refresh_rate;
 
-  caps_sizefilter = gst_caps_new_simple ("video/x-raw",
-                                         "framerate", GST_TYPE_FRACTION, resolution->refresh_rate, 1,
-                                         "width", G_TYPE_INT, resolution->width,
-                                         "height", G_TYPE_INT, resolution->height,
-                                         NULL);
+  srcfilter = gst_bin_get_by_name (bin, "srcfilter");
+  if (srcfilter != NULL)
+    {
+      caps = gst_caps_new_simple ("video/x-raw",
+                                  "max-framerate", GST_TYPE_FRACTION, resolution->refresh_rate, 1,
+                                  "width", G_TYPE_INT, resolution->width,
+                                  "height", G_TYPE_INT, resolution->height,
+                                  NULL);
 
-  sizefilter = gst_bin_get_by_name (bin, "wfd-sizefilter");
-  g_object_set (sizefilter,
-                "caps", caps_sizefilter,
+      g_object_set (srcfilter,
+                    "caps", caps,
+                    NULL);
+      g_clear_pointer (&caps, gst_caps_unref);
+    }
+
+  caps = gst_caps_new_simple ("video/x-raw",
+                              "framerate", GST_TYPE_FRACTION, resolution->refresh_rate, 1,
+                              "width", G_TYPE_INT, resolution->width,
+                              "height", G_TYPE_INT, resolution->height,
+                              NULL);
+
+  sinkfilter = gst_bin_get_by_name (bin, "wfd-sinkfilter");
+  g_object_set (sinkfilter,
+                "caps", caps,
                 NULL);
+  g_clear_pointer (&caps, gst_caps_unref);
 
   switch (encoder_impl)
     {
@@ -592,6 +623,17 @@ wfd_configure_media_element (GstBin *bin, WfdParams *params)
                     NULL);
       break;
 
+    case ELEMENT_VAH264:
+      if (codec->profile == WFD_H264_PROFILE_HIGH)
+        profile = WFD_H264_PROFILE_HIGH;
+      else
+        profile = WFD_H264_PROFILE_BASE;
+
+      g_object_set (encoder,
+                    "key-int-max", (guint) gop_size,
+                    "bitrate",  bitrate_kbit,
+                    NULL);
+      break;
 
     case ELEMENT_VAAPIH264:
       if (codec->profile == WFD_H264_PROFILE_HIGH)
@@ -610,20 +652,20 @@ wfd_configure_media_element (GstBin *bin, WfdParams *params)
     }
 
   if (profile == WFD_H264_PROFILE_HIGH)
-    caps_codecfilter = gst_caps_from_string ("video/x-h264,stream-format=byte-stream,profile=high");
+    caps = gst_caps_from_string ("video/x-h264,stream-format=byte-stream,profile=high");
   else
     {
       /* Permit both constrained-baseline and baseline. Would constrained-baseline be sufficient? */
-      caps_codecfilter = gst_caps_from_string ("video/x-h264,stream-format=byte-stream,profile=constrained-baseline");
-      gst_caps_append (caps_codecfilter,
+      caps = gst_caps_from_string ("video/x-h264,stream-format=byte-stream,profile=constrained-baseline");
+      gst_caps_append (caps,
                        gst_caps_from_string ("video/x-h264,stream-format=byte-stream,profile=baseline"));
     }
 
   codecfilter = gst_bin_get_by_name (bin, "wfd-codecfilter");
   g_object_set (codecfilter,
-                "caps", caps_codecfilter,
+                "caps", caps,
                 NULL);
-
+  g_clear_pointer (&caps, gst_caps_unref);
 
   g_debug ("An audiocodec has been selected: %s", params->selected_audio_codec ? "yes" : "no");
   audio_pipeline = gst_bin_get_by_name (bin, "wfd-audio");
@@ -652,7 +694,7 @@ wfd_configure_media_element (GstBin *bin, WfdParams *params)
 
   GST_DEBUG_BIN_TO_DOT_FILE (bin,
                              GST_DEBUG_GRAPH_SHOW_ALL,
-                             "wfd-encoder-bin-configured");
+                             "nd-wfd-pipeline-configured");
 
   return quirks;
 }
@@ -811,10 +853,12 @@ missing_elements:
     case PROFILE_BASE_H264:
       if  (!wfd_gst_element_present (ELEMENT_OPENH264) &&
            !wfd_gst_element_present (ELEMENT_X264) &&
+           !wfd_gst_element_present (ELEMENT_VAH264) &&
            !wfd_gst_element_present (ELEMENT_VAAPIH264))
         {
-          gchar *missing[4] = { (gchar *) wfd_gst_elements[ELEMENT_OPENH264],
+          gchar *missing[5] = { (gchar *) wfd_gst_elements[ELEMENT_OPENH264],
                                 (gchar *) wfd_gst_elements[ELEMENT_X264],
+                                (gchar *) wfd_gst_elements[ELEMENT_VAH264],
                                 (gchar *) wfd_gst_elements[ELEMENT_VAAPIH264],
                                 NULL };
           *missing_video = (GStrv) g_strdupv (missing);
@@ -830,9 +874,11 @@ missing_elements:
 
     case PROFILE_HIGH_H264:
       if (!wfd_gst_element_present (ELEMENT_X264) &&
+          !wfd_gst_element_present (ELEMENT_VAH264) &&
           !wfd_gst_element_present (ELEMENT_VAAPIH264))
         {
-          gchar *missing[3] = { (gchar *) wfd_gst_elements[ELEMENT_X264],
+          gchar *missing[4] = { (gchar *) wfd_gst_elements[ELEMENT_X264],
+                                (gchar *) wfd_gst_elements[ELEMENT_VAH264],
                                 (gchar *) wfd_gst_elements[ELEMENT_VAAPIH264],
                                 NULL };
           *missing_video = (GStrv) g_strdupv (missing);
