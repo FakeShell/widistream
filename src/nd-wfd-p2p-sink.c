@@ -16,11 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "gnome-network-displays-config.h"
+#include "nd-enum-types.h"
+#include "nd-firewalld.h"
+#include "nd-uri-helpers.h"
+#include "nd-wfd-p2p-sink.h"
 #include "wfd/wfd-client.h"
 #include "wfd/wfd-server.h"
-#include "gnome-network-displays-config.h"
-#include "nd-firewalld.h"
-#include "nd-wfd-p2p-sink.h"
 
 struct _NdWFDP2PSink
 {
@@ -35,6 +37,8 @@ struct _NdWFDP2PSink
   NMWifiP2PPeer      *nm_peer;
   NMActiveConnection *nm_ac;
 
+  gchar              *uuid;
+
   GtkStringList      *missing_video_codec;
   GtkStringList      *missing_audio_codec;
   char               *missing_firewall_zone;
@@ -48,20 +52,25 @@ enum {
   PROP_DEVICE,
   PROP_PEER,
 
+  PROP_UUID,
   PROP_DISPLAY_NAME,
   PROP_MATCHES,
   PROP_PRIORITY,
   PROP_STATE,
+  PROP_PROTOCOL,
   PROP_MISSING_VIDEO_CODEC,
   PROP_MISSING_AUDIO_CODEC,
   PROP_MISSING_FIREWALL_ZONE,
 
-  PROP_LAST = PROP_DISPLAY_NAME,
+  PROP_LAST = PROP_UUID,
 };
+
+const static NdSinkProtocol protocol = ND_SINK_PROTOCOL_WFD_P2P;
 
 static void nd_wfd_p2p_sink_sink_iface_init (NdSinkIface *iface);
 static NdSink * nd_wfd_p2p_sink_sink_start_stream (NdSink *sink);
 static void nd_wfd_p2p_sink_sink_stop_stream (NdSink *sink);
+static gchar * nd_wfd_p2p_sink_sink_to_uri (NdSink *sink);
 
 static void nd_wfd_p2p_sink_sink_stop_stream_int (NdWFDP2PSink *self);
 
@@ -123,6 +132,10 @@ nd_wfd_p2p_sink_get_property (GObject    *object,
       g_value_set_object (value, sink->nm_peer);
       break;
 
+    case PROP_UUID:
+      g_value_set_string (value, sink->uuid);
+      break;
+
     case PROP_DISPLAY_NAME:
       g_object_get_property (G_OBJECT (sink->nm_peer), "name", value);
       break;
@@ -154,6 +167,10 @@ nd_wfd_p2p_sink_get_property (GObject    *object,
 
     case PROP_STATE:
       g_value_set_enum (value, sink->state);
+      break;
+
+    case PROP_PROTOCOL:
+      g_value_set_enum (value, protocol);
       break;
 
     case PROP_MISSING_VIDEO_CODEC:
@@ -267,10 +284,12 @@ nd_wfd_p2p_sink_class_init (NdWFDP2PSinkClass *klass)
 
   g_object_class_install_properties (object_class, PROP_LAST, props);
 
+  g_object_class_override_property (object_class, PROP_UUID, "uuid");
   g_object_class_override_property (object_class, PROP_DISPLAY_NAME, "display-name");
   g_object_class_override_property (object_class, PROP_MATCHES, "matches");
   g_object_class_override_property (object_class, PROP_PRIORITY, "priority");
   g_object_class_override_property (object_class, PROP_STATE, "state");
+  g_object_class_override_property (object_class, PROP_PROTOCOL, "protocol");
   g_object_class_override_property (object_class, PROP_MISSING_VIDEO_CODEC, "missing-video-codec");
   g_object_class_override_property (object_class, PROP_MISSING_AUDIO_CODEC, "missing-audio-codec");
   g_object_class_override_property (object_class, PROP_MISSING_FIREWALL_ZONE, "missing-firewall-zone");
@@ -279,8 +298,29 @@ nd_wfd_p2p_sink_class_init (NdWFDP2PSinkClass *klass)
 static void
 nd_wfd_p2p_sink_init (NdWFDP2PSink *sink)
 {
+  sink->uuid = g_uuid_string_random ();
   sink->state = ND_SINK_STATE_DISCONNECTED;
   sink->cancellable = g_cancellable_new ();
+}
+
+static gchar *
+nd_wfd_p2p_sink_sink_to_uri (NdSink *sink)
+{
+  NdWFDP2PSink *self = ND_WFD_P2P_SINK (sink);
+  GHashTable *params = g_hash_table_new (g_str_hash, g_str_equal);
+
+  /* protocol */
+  g_hash_table_insert (params, "protocol", (gpointer *) g_strdup_printf ("%d", protocol));
+
+  /* device */
+  const gchar *device_path = nm_object_get_path ((NMObject *) self->nm_device);
+  g_hash_table_insert (params, "device", (gpointer *) g_strdup (device_path));
+
+  /* peer */
+  const gchar *peer_path = nm_object_get_path ((NMObject *) self->nm_peer);
+  g_hash_table_insert (params, "peer", (gpointer *) g_strdup (peer_path));
+
+  return nd_uri_helpers_generate_uri (params);
 }
 
 /******************************************************************
@@ -292,6 +332,7 @@ nd_wfd_p2p_sink_sink_iface_init (NdSinkIface *iface)
 {
   iface->start_stream = nd_wfd_p2p_sink_sink_start_stream;
   iface->stop_stream = nd_wfd_p2p_sink_sink_stop_stream;
+  iface->to_uri = nd_wfd_p2p_sink_sink_to_uri;
 }
 
 static void
@@ -666,4 +707,69 @@ nd_wfd_p2p_sink_new (NMClient *client, NMDevice *device, NMWifiP2PPeer * peer)
                        "device", device,
                        "peer", peer,
                        NULL);
+}
+
+/**
+ * nd_wfd_p2p_sink_from_uri
+ * @uri: a URI string
+ *
+ * Construct a #NdWFDP2PSink using the information encoded in the URI string
+ *
+ * Returns: The newly constructed #NdWFDP2PSink
+ */
+NdWFDP2PSink *
+nd_wfd_p2p_sink_from_uri (gchar *uri)
+{
+  GHashTable *params = nd_uri_helpers_parse_uri (uri);
+  GError *error = NULL;
+
+  /* protocol */
+  const gchar *protocol_in_uri_str = g_hash_table_lookup (params, "protocol");
+
+  NdSinkProtocol protocol_in_uri = g_ascii_strtoll (protocol_in_uri_str, NULL, 10);
+  if (protocol != protocol_in_uri)
+    {
+      g_warning ("NdWFDP2PSink: Attempted to create sink whose protocol (%s) doesn't match the URI (%s)",
+                 g_enum_to_string (ND_TYPE_SINK_PROTOCOL, protocol),
+                 g_enum_to_string (ND_TYPE_SINK_PROTOCOL, protocol_in_uri));
+      return NULL;
+    }
+
+  /* client */
+  NMClient *client = nm_client_new (NULL, &error);
+  if (!client)
+    {
+      g_warning ("NdWFDP2PSink: Failed to instantiate NetworkManager client: %s", error->message);
+      return NULL;
+    }
+
+  /* device */
+  const gchar *device_path = g_hash_table_lookup (params, "device");
+  if (!device_path)
+    {
+      g_warning ("NdWFDP2PSink: Failed to find device path in the URI %s", uri);
+      return NULL;
+    }
+  NMDevice *device = nm_client_get_device_by_path (client, device_path);
+  if (!device)
+    {
+      g_warning ("NdWFDP2PSink: Failed to find device with path %s", device_path);
+      return NULL;
+    }
+
+  /* peer */
+  const gchar *peer_path = g_hash_table_lookup (params, "peer");
+  if (!peer_path)
+    {
+      g_warning ("NdWFDP2PSink: Failed to find peer path in the URI %s", uri);
+      return NULL;
+    }
+  NMWifiP2PPeer *peer = nm_device_wifi_p2p_get_peer_by_path ((NMDeviceWifiP2P *) device, peer_path);
+  if (!peer)
+    {
+      g_warning ("NdWFDP2PSink: Failed to find peer with path %s", peer_path);
+      return NULL;
+    }
+
+  return nd_wfd_p2p_sink_new (client, device, peer);
 }
