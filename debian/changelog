@@ -1,3 +1,9 @@
+gnome-network-displays (0.96.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Mon, 07 Apr 2025 08:36:18 -0400
+
 gnome-network-displays (0.94.0-1) unstable; urgency=medium
 
   * Team upload
