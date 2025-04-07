@@ -48,6 +48,18 @@ typedef enum {
   ND_SCREEN_CAST_SOURCE_TYPE_VIRTUAL = 4,
 } NdScreenCastSourceType;
 
+typedef enum {
+  /* internal protocols */
+  ND_SINK_PROTOCOL_META,
+  ND_SINK_PROTOCOL_DUMMY_WFD_P2P,
+  ND_SINK_PROTOCOL_DUMMY_CC,
+
+  /* real protocols */
+  ND_SINK_PROTOCOL_WFD_P2P,
+  ND_SINK_PROTOCOL_WFD_MICE,
+  ND_SINK_PROTOCOL_CC,
+} NdSinkProtocol;
+
 struct _NdSinkIface
 {
   /*< private >*/
@@ -56,12 +68,14 @@ struct _NdSinkIface
   /*< public >*/
   NdSink * (* start_stream) (NdSink *sink);
   void     (* stop_stream)  (NdSink *sink);
+  gchar  * (* to_uri)       (NdSink *sink);
 };
 
 GType nd_sink_get_type (void) G_GNUC_CONST;
 
 NdSink *nd_sink_start_stream (NdSink *sink);
-void            nd_sink_stop_stream (NdSink *sink);
+void    nd_sink_stop_stream (NdSink *sink);
+gchar  *nd_sink_to_uri (NdSink *sink);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (NdSink, g_object_unref)
 

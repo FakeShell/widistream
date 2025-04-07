@@ -18,11 +18,13 @@
 
 #include "gnome-network-displays-config.h"
 #include "nd-meta-sink.h"
+#include "nd-sink.h"
 
 struct _NdMetaSink
 {
   GObject    parent_instance;
 
+  gchar     *uuid;
   NdSink    *current_sink;
   GPtrArray *sinks;
 };
@@ -31,20 +33,25 @@ enum {
   PROP_SINK = 1,
   PROP_SINKS,
 
+  PROP_UUID,
   PROP_DISPLAY_NAME,
   PROP_MATCHES,
   PROP_PRIORITY,
   PROP_STATE,
+  PROP_PROTOCOL,
   PROP_MISSING_VIDEO_CODEC,
   PROP_MISSING_AUDIO_CODEC,
   PROP_MISSING_FIREWALL_ZONE,
 
-  PROP_LAST = PROP_DISPLAY_NAME,
+  PROP_LAST = PROP_UUID,
 };
+
+const static NdSinkProtocol protocol = ND_SINK_PROTOCOL_META;
 
 static void nd_meta_sink_sink_iface_init (NdSinkIface *iface);
 static NdSink * nd_meta_sink_sink_start_stream (NdSink *sink);
 static void nd_meta_sink_sink_stop_stream (NdSink *sink);
+static gchar * nd_meta_sink_sink_to_uri (NdSink *sink);
 
 G_DEFINE_TYPE_EXTENDED (NdMetaSink, nd_meta_sink, G_TYPE_OBJECT, 0,
                         G_IMPLEMENT_INTERFACE (ND_TYPE_SINK,
@@ -110,6 +117,7 @@ nd_meta_sink_update (NdMetaSink *meta_sink)
   g_object_notify (G_OBJECT (meta_sink), "display-name");
   g_object_notify (G_OBJECT (meta_sink), "priority");
   g_object_notify (G_OBJECT (meta_sink), "state");
+  g_object_notify (G_OBJECT (meta_sink), "protocol");
   g_object_notify (G_OBJECT (meta_sink), "missing-video-codec");
   g_object_notify (G_OBJECT (meta_sink), "missing-audio-codec");
   g_object_notify (G_OBJECT (meta_sink), "missing-firewall-zone");
@@ -131,6 +139,10 @@ nd_meta_sink_get_property (GObject    *object,
 
     case PROP_SINKS:
       g_value_set_boxed (value, meta_sink->sinks);
+      break;
+
+    case PROP_UUID:
+      g_value_set_string (value, meta_sink->uuid);
       break;
 
     case PROP_DISPLAY_NAME:
@@ -174,6 +186,10 @@ nd_meta_sink_get_property (GObject    *object,
         g_object_get_property (G_OBJECT (meta_sink->current_sink), pspec->name, value);
       else
         g_value_set_enum (value, ND_SINK_STATE_DISCONNECTED);
+      break;
+
+    case PROP_PROTOCOL:
+      g_value_set_enum (value, protocol);
       break;
 
     case PROP_MISSING_VIDEO_CODEC:
@@ -255,10 +271,12 @@ nd_meta_sink_class_init (NdMetaSinkClass *klass)
 
   g_object_class_install_properties (object_class, PROP_LAST, props);
 
+  g_object_class_override_property (object_class, PROP_UUID, "uuid");
   g_object_class_override_property (object_class, PROP_DISPLAY_NAME, "display-name");
   g_object_class_override_property (object_class, PROP_MATCHES, "matches");
   g_object_class_override_property (object_class, PROP_PRIORITY, "priority");
   g_object_class_override_property (object_class, PROP_STATE, "state");
+  g_object_class_override_property (object_class, PROP_PROTOCOL, "protocol");
   g_object_class_override_property (object_class, PROP_MISSING_VIDEO_CODEC, "missing-video-codec");
   g_object_class_override_property (object_class, PROP_MISSING_AUDIO_CODEC, "missing-audio-codec");
   g_object_class_override_property (object_class, PROP_MISSING_FIREWALL_ZONE, "missing-firewall-zone");
@@ -267,7 +285,18 @@ nd_meta_sink_class_init (NdMetaSinkClass *klass)
 static void
 nd_meta_sink_init (NdMetaSink *meta_sink)
 {
+  meta_sink->uuid = g_uuid_string_random ();
   meta_sink->sinks = g_ptr_array_new_with_free_func (g_object_unref);
+}
+
+static gchar *
+nd_meta_sink_sink_to_uri (NdSink *sink)
+{
+  NdMetaSink *meta_sink = ND_META_SINK (sink);
+
+  g_assert (meta_sink->current_sink);
+
+  return nd_sink_to_uri (meta_sink->current_sink);
 }
 
 /******************************************************************
@@ -279,6 +308,7 @@ nd_meta_sink_sink_iface_init (NdSinkIface *iface)
 {
   iface->start_stream = nd_meta_sink_sink_start_stream;
   iface->stop_stream = nd_meta_sink_sink_stop_stream;
+  iface->to_uri = nd_meta_sink_sink_to_uri;
 }
 
 static NdSink *

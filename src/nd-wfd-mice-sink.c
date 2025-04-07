@@ -17,9 +17,11 @@
  */
 
 #include "gnome-network-displays-config.h"
+#include "nd-enum-types.h"
+#include "nd-uri-helpers.h"
+#include "nd-wfd-mice-sink.h"
 #include "wfd/wfd-client.h"
 #include "wfd/wfd-server.h"
-#include "nd-wfd-mice-sink.h"
 
 struct _NdWFDMiceSink
 {
@@ -33,6 +35,7 @@ struct _NdWFDMiceSink
   GtkStringList     *missing_audio_codec;
   char              *missing_firewall_zone;
 
+  gchar             *uuid;
   gchar             *name;
   gchar             *ip;
   gchar             *p2p_mac;
@@ -49,20 +52,25 @@ enum {
   PROP_NAME,
   PROP_IP,
   PROP_P2P_MAC,
+  PROP_UUID,
   PROP_DISPLAY_NAME,
   PROP_MATCHES,
   PROP_PRIORITY,
   PROP_STATE,
+  PROP_PROTOCOL,
   PROP_MISSING_VIDEO_CODEC,
   PROP_MISSING_AUDIO_CODEC,
   PROP_MISSING_FIREWALL_ZONE,
 
-  PROP_LAST = PROP_DISPLAY_NAME,
+  PROP_LAST = PROP_UUID,
 };
+
+const static NdSinkProtocol protocol = ND_SINK_PROTOCOL_WFD_MICE;
 
 static void nd_wfd_mice_sink_sink_iface_init (NdSinkIface *iface);
 static NdSink * nd_wfd_mice_sink_sink_start_stream (NdSink *sink);
 static void nd_wfd_mice_sink_sink_stop_stream (NdSink *sink);
+static gchar * nd_wfd_mice_sink_sink_to_uri (NdSink *sink);
 
 static void nd_wfd_mice_sink_sink_stop_stream_int (NdWFDMiceSink *self);
 
@@ -122,6 +130,10 @@ nd_wfd_mice_sink_get_property (GObject    *object,
       g_value_set_string (value, sink->p2p_mac);
       break;
 
+    case PROP_UUID:
+      g_value_set_string (value, sink->uuid);
+      break;
+
     case PROP_DISPLAY_NAME:
       g_object_get_property (G_OBJECT (sink), "name", value);
       break;
@@ -152,6 +164,10 @@ nd_wfd_mice_sink_get_property (GObject    *object,
 
     case PROP_STATE:
       g_value_set_enum (value, sink->state);
+      break;
+
+    case PROP_PROTOCOL:
+      g_value_set_enum (value, protocol);
       break;
 
     case PROP_MISSING_VIDEO_CODEC:
@@ -263,10 +279,12 @@ nd_wfd_mice_sink_class_init (NdWFDMiceSinkClass *klass)
 
   g_object_class_install_properties (object_class, PROP_LAST, props);
 
+  g_object_class_override_property (object_class, PROP_UUID, "uuid");
   g_object_class_override_property (object_class, PROP_DISPLAY_NAME, "display-name");
   g_object_class_override_property (object_class, PROP_MATCHES, "matches");
   g_object_class_override_property (object_class, PROP_PRIORITY, "priority");
   g_object_class_override_property (object_class, PROP_STATE, "state");
+  g_object_class_override_property (object_class, PROP_PROTOCOL, "protocol");
   g_object_class_override_property (object_class, PROP_MISSING_VIDEO_CODEC, "missing-video-codec");
   g_object_class_override_property (object_class, PROP_MISSING_AUDIO_CODEC, "missing-audio-codec");
   g_object_class_override_property (object_class, PROP_MISSING_FIREWALL_ZONE, "missing-firewall-zone");
@@ -275,10 +293,30 @@ nd_wfd_mice_sink_class_init (NdWFDMiceSinkClass *klass)
 static void
 nd_wfd_mice_sink_init (NdWFDMiceSink *sink)
 {
+  sink->uuid = g_uuid_string_random ();
   sink->state = ND_SINK_STATE_DISCONNECTED;
   sink->cancellable = g_cancellable_new ();
   sink->signalling_client = g_socket_client_new ();
 }
+
+static gchar *
+nd_wfd_mice_sink_sink_to_uri (NdSink *sink)
+{
+  NdWFDMiceSink *self = ND_WFD_MICE_SINK (sink);
+  GHashTable *params = g_hash_table_new (g_str_hash, g_str_equal);
+
+  /* protocol */
+  g_hash_table_insert (params, "protocol", (gpointer *) g_strdup_printf ("%d", protocol));
+
+  /* remote name */
+  g_hash_table_insert (params, "name", (gpointer *) g_strdup (self->name));
+
+  /* remote ip */
+  g_hash_table_insert (params, "ip", (gpointer *) g_strdup (self->ip));
+
+  return nd_uri_helpers_generate_uri (params);
+}
+
 
 /******************************************************************
 * NdSink interface implementation
@@ -289,6 +327,7 @@ nd_wfd_mice_sink_sink_iface_init (NdSinkIface *iface)
 {
   iface->start_stream = nd_wfd_mice_sink_sink_start_stream;
   iface->stop_stream = nd_wfd_mice_sink_sink_stop_stream;
+  iface->to_uri = nd_wfd_mice_sink_sink_to_uri;
 }
 
 static void
@@ -615,6 +654,55 @@ nd_wfd_mice_sink_new (gchar *name,
                        "ip", ip,
                        "p2p-mac", p2p_mac,
                        NULL);
+}
+
+/**
+ * nd_wfd_mice_sink_from_uri
+ * @uri: a URI string
+ *
+ * Construct a #NdWFDMiceSink using the information encoded in the URI string
+ *
+ * Returns: The newly constructed #NdWFDMiceSink
+ */
+NdWFDMiceSink *
+nd_wfd_mice_sink_from_uri (gchar *uri)
+{
+  GHashTable *params = nd_uri_helpers_parse_uri (uri);
+
+  /* protocol */
+  const gchar *protocol_in_uri_str = g_hash_table_lookup (params, "protocol");
+
+  ;
+  NdSinkProtocol protocol_in_uri = g_ascii_strtoll (protocol_in_uri_str, NULL, 10);
+  if (protocol != protocol_in_uri)
+    {
+      g_warning ("NdWFDMiceSink: Attempted to create sink whose protocol (%s) doesn't match the URI (%s)",
+                 g_enum_to_string (ND_TYPE_SINK_PROTOCOL, protocol),
+                 g_enum_to_string (ND_TYPE_SINK_PROTOCOL, protocol_in_uri));
+      return NULL;
+    }
+
+  /* remote name */
+  gchar *name = g_hash_table_lookup (params, "name");
+  if (!name)
+    {
+      g_warning ("NdWFDMiceSink: Failed to find remote name in the URI %s", uri);
+      return NULL;
+    }
+
+  /* remote ip */
+  gchar *ip = g_hash_table_lookup (params, "ip");
+  if (!ip)
+    {
+      g_warning ("NdWFDMiceSink: Failed to find remote IP address in the URI %s", uri);
+      return NULL;
+    }
+
+  /* optional remote p2p mac */
+  gchar *p2p_mac = NULL;
+  p2p_mac = g_hash_table_lookup (params, "p2p-mac");
+
+  return nd_wfd_mice_sink_new (name, ip, p2p_mac);
 }
 
 NdSinkState

@@ -17,15 +17,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "cc/cc-http-server.h"
 #include "gnome-network-displays-config.h"
 #include "nd-dummy-cc-sink.h"
-#include "cc/cc-http-server.h"
+#include "nd-enum-types.h"
+#include "nd-uri-helpers.h"
 
 struct _NdDummyCCSink
 {
   GObject        parent_instance;
 
   NdSinkState    state;
+
+  gchar         *uuid;
 
   GtkStringList *missing_video_codec;
   GtkStringList *missing_audio_codec;
@@ -39,20 +43,25 @@ enum {
   PROP_DEVICE,
   PROP_PEER,
 
+  PROP_UUID,
   PROP_DISPLAY_NAME,
   PROP_MATCHES,
   PROP_PRIORITY,
   PROP_STATE,
+  PROP_PROTOCOL,
   PROP_MISSING_VIDEO_CODEC,
   PROP_MISSING_AUDIO_CODEC,
   PROP_MISSING_FIREWALL_ZONE,
 
-  PROP_LAST = PROP_DISPLAY_NAME,
+  PROP_LAST = PROP_UUID,
 };
+
+const static NdSinkProtocol protocol = ND_SINK_PROTOCOL_DUMMY_CC;
 
 static void nd_dummy_cc_sink_sink_iface_init (NdSinkIface *iface);
 static NdSink * nd_dummy_cc_sink_sink_start_stream (NdSink *sink);
 static void nd_dummy_cc_sink_sink_stop_stream (NdSink *sink);
+static gchar * nd_dummy_cc_sink_sink_to_uri (NdSink *sink);
 
 G_DEFINE_TYPE_EXTENDED (NdDummyCCSink, nd_dummy_cc_sink, G_TYPE_OBJECT, 0,
                         G_IMPLEMENT_INTERFACE (ND_TYPE_SINK,
@@ -70,6 +79,10 @@ nd_dummy_cc_sink_get_property (GObject    *object,
 
   switch (prop_id)
     {
+    case PROP_UUID:
+      g_value_set_string (value, sink->uuid);
+      break;
+
     case PROP_DISPLAY_NAME:
       g_value_set_string (value, "Dummy ChromeCast Sink");
       break;
@@ -91,6 +104,10 @@ nd_dummy_cc_sink_get_property (GObject    *object,
 
     case PROP_STATE:
       g_value_set_enum (value, sink->state);
+      break;
+
+    case PROP_PROTOCOL:
+      g_value_set_enum (value, protocol);
       break;
 
     case PROP_MISSING_VIDEO_CODEC:
@@ -133,10 +150,12 @@ nd_dummy_cc_sink_class_init (NdDummyCCSinkClass *klass)
   object_class->get_property = nd_dummy_cc_sink_get_property;
   object_class->finalize = nd_dummy_cc_sink_finalize;
 
+  g_object_class_override_property (object_class, PROP_UUID, "uuid");
   g_object_class_override_property (object_class, PROP_DISPLAY_NAME, "display-name");
   g_object_class_override_property (object_class, PROP_MATCHES, "matches");
   g_object_class_override_property (object_class, PROP_PRIORITY, "priority");
   g_object_class_override_property (object_class, PROP_STATE, "state");
+  g_object_class_override_property (object_class, PROP_PROTOCOL, "protocol");
   g_object_class_override_property (object_class, PROP_MISSING_VIDEO_CODEC, "missing-video-codec");
   g_object_class_override_property (object_class, PROP_MISSING_AUDIO_CODEC, "missing-audio-codec");
   g_object_class_override_property (object_class, PROP_MISSING_FIREWALL_ZONE, "missing-firewall-zone");
@@ -145,7 +164,19 @@ nd_dummy_cc_sink_class_init (NdDummyCCSinkClass *klass)
 static void
 nd_dummy_cc_sink_init (NdDummyCCSink *sink)
 {
+  sink->uuid = g_uuid_string_random ();
   sink->state = ND_SINK_STATE_DISCONNECTED;
+}
+
+static gchar *
+nd_dummy_cc_sink_sink_to_uri (NdSink *sink)
+{
+  GHashTable *params = g_hash_table_new (g_str_hash, g_str_equal);
+
+  /* protocol */
+  g_hash_table_insert (params, "protocol", (gpointer *) g_strdup_printf ("%d", protocol));
+
+  return nd_uri_helpers_generate_uri (params);
 }
 
 /******************************************************************
@@ -157,6 +188,7 @@ nd_dummy_cc_sink_sink_iface_init (NdSinkIface *iface)
 {
   iface->start_stream = nd_dummy_cc_sink_sink_start_stream;
   iface->stop_stream = nd_dummy_cc_sink_sink_stop_stream;
+  iface->to_uri = nd_dummy_cc_sink_sink_to_uri;
 }
 
 static void
@@ -304,4 +336,33 @@ nd_dummy_cc_sink_new (void)
 {
   return g_object_new (ND_TYPE_DUMMY_CC_SINK,
                        NULL);
+}
+
+/**
+ * nd_dummy_cc_sink_from_uri
+ * @uri: a URI string
+ *
+ * Construct a #NdDummyCCSink using the information encoded in the URI string
+ *
+ * Returns: The newly constructed #NdDummyCCSink
+ */
+NdDummyCCSink *
+nd_dummy_cc_sink_from_uri (gchar *uri)
+{
+  GHashTable *params = nd_uri_helpers_parse_uri (uri);
+
+  /* protocol */
+  const gchar *protocol_in_uri_str = g_hash_table_lookup (params, "protocol");
+
+  ;
+  NdSinkProtocol protocol_in_uri = g_ascii_strtoll (protocol_in_uri_str, NULL, 10);
+  if (protocol != protocol_in_uri)
+    {
+      g_warning ("NdDummyCCSink: Attempted to create sink whose protocol (%s) doesn't match the URI (%s)",
+                 g_enum_to_string (ND_TYPE_SINK_PROTOCOL, protocol),
+                 g_enum_to_string (ND_TYPE_SINK_PROTOCOL, protocol_in_uri));
+      return NULL;
+    }
+
+  return nd_dummy_cc_sink_new ();
 }

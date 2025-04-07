@@ -18,8 +18,9 @@
 
 #include <gio/gio.h>
 #include <gst/gst.h>
-#include "nd-sink.h"
 #include "gnome-network-displays-config.h"
+#include "nd-sink.h"
+#include "nd-enum-types.h"
 
 typedef NdSinkIface NdSinkInterface;
 G_DEFINE_INTERFACE (NdSink, nd_sink, G_TYPE_OBJECT);
@@ -40,6 +41,13 @@ nd_sink_default_init (NdSinkIface *iface)
                 g_signal_accumulator_first_wins, NULL,
                 NULL,
                 GST_TYPE_ELEMENT, 0);
+
+  g_object_interface_install_property (iface,
+                                       g_param_spec_string ("uuid",
+                                                            "UUID",
+                                                            "UUID (universally unique identifier) of the sink",
+                                                            NULL,
+                                                            G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_interface_install_property (iface,
                                        g_param_spec_string ("display-name",
@@ -70,6 +78,14 @@ nd_sink_default_init (NdSinkIface *iface)
                                                           "The current state of the sink.",
                                                           ND_TYPE_SINK_STATE,
                                                           ND_SINK_STATE_DISCONNECTED,
+                                                          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_interface_install_property (iface,
+                                       g_param_spec_enum ("protocol",
+                                                          "Protocol",
+                                                          "The protocol used by the sink",
+                                                          ND_TYPE_SINK_PROTOCOL,
+                                                          ND_SINK_PROTOCOL_META,
                                                           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_interface_install_property (iface,
@@ -125,4 +141,18 @@ nd_sink_stop_stream (NdSink *sink)
   NdSinkIface *iface = ND_SINK_GET_IFACE (sink);
 
   iface->stop_stream (sink);
+}
+
+/**
+ * nd_sink_to_uri
+ * @sink: the #NdSink
+ *
+ * Create a URI string for the given sink
+ */
+gchar *
+nd_sink_to_uri (NdSink *sink)
+{
+  NdSinkIface *iface = ND_SINK_GET_IFACE (sink);
+
+  return iface->to_uri (sink);
 }
