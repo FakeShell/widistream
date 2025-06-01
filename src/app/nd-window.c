@@ -21,7 +21,6 @@
 #include <glib/gi18n.h>
 #include <gst/base/base.h>
 #include <gst/gst.h>
-#include <libportal-gtk4/portal-gtk4.h>
 #include "gnome-network-displays-config.h"
 #include "nd-cc-provider.h"
 #include "nd-codec-install.h"
@@ -42,8 +41,6 @@ struct _NdWindow
   NdMetaProvider        *meta_provider;
   NdNMDeviceRegistry    *nm_device_registry;
 
-  XdpPortal             *portal;
-  XdpSession            *session;
   NdScreenCastSourceType screencast_type;
   gboolean               use_x11;
 
@@ -52,6 +49,8 @@ struct _NdWindow
   GCancellable          *cancellable;
 
   NdSink                *stream_sink;
+  NdSink                *pending_sink;
+  gchar                 *selected_video_file;
 
   GPtrArray             *sink_property_bindings;
 
@@ -61,6 +60,10 @@ struct _NdWindow
 
   GtkListBox      *find_sink_list;
   NdSinkListModel *find_sink_list_model;
+
+  /* Content selection page widgets */
+  GtkButton       *select_video_file_button;
+  GtkButton       *select_content_back_button;
 
   GtkListBox      *connect_sink_list;
   GListStore      *connect_sink_list_model;
@@ -86,106 +89,88 @@ struct _NdWindow
 G_DEFINE_TYPE (NdWindow, gnome_nd_window, ADW_TYPE_APPLICATION_WINDOW)
 
 static GstElement *
-nd_window_screencast_get_source (NdWindow * self)
+sink_create_source_cb (NdWindow *self, NdSink *sink)
 {
-  g_autoptr(GVariant) stream_properties = NULL;
-  g_autoptr(GError) error = NULL;
-  GstElement *src = NULL;
-  GVariant *streams = NULL;
-  GVariantIter iter;
-  guint32 node_id;
-  guint32 screencast_type;
-
-  if (!self->session)
-    g_error ("XDP session not found!");
-
-  streams = xdp_session_get_streams (self->session);
-  if (streams == NULL)
-    g_error ("XDP session streams not found!");
-
-  g_variant_iter_init (&iter, streams);
-  g_variant_iter_loop (&iter, "(u@a{sv})", &node_id, &stream_properties);
-  g_variant_lookup (stream_properties, "source_type", "u", &screencast_type);
-
-  g_debug ("Got a stream with node ID: %d", node_id);
-  g_debug ("Got a stream of type: %d", screencast_type);
-
-  switch (screencast_type)
-    {
-    case ND_SCREEN_CAST_SOURCE_TYPE_MONITOR:
-    case ND_SCREEN_CAST_SOURCE_TYPE_WINDOW:
-    case ND_SCREEN_CAST_SOURCE_TYPE_VIRTUAL:
-      self->screencast_type = screencast_type;
-      break;
-
-    default:
-      g_assert_not_reached ();
-    }
-
-  src = gst_element_factory_make ("pipewiresrc", "portal-pipewire-source");
-  if (src == NULL)
-    g_error ("GStreamer element \"pipewiresrc\" could not be created!");
-
-  g_object_set (src,
-                "fd", xdp_session_open_pipewire_remote (self->session),
-                "path", g_strdup_printf ("%u", node_id),
-                "do-timestamp", TRUE,
-                NULL);
-
-  gst_base_src_set_live (GST_BASE_SRC (src), TRUE);
-
-  return g_steal_pointer (&src);
-}
-
-static GstElement *
-sink_create_source_cb (NdWindow * self, NdSink * sink)
-{
-  g_autoptr(GstCaps) caps = NULL;
+  GstElement *playbin, *videosink, *audiosink, *res;
   GstBin *bin;
-  GstElement *src, *filter, *dst, *res;
+  gchar *uri;
 
-  bin = GST_BIN (gst_bin_new ("screencast source bin"));
-  g_debug ("use x11: %d", self->use_x11);
-  if (self->use_x11)
-    src = gst_element_factory_make ("ximagesrc", "X11 screencast source");
-  else
-    src = nd_window_screencast_get_source (self);
+  if (!self->selected_video_file) {
+    g_warning ("NdWindow: No video file selected!");
+    return NULL;
+  }
 
-  if (!src)
-    g_error ("Error creating video source element, likely a missing dependency!");
+  bin = GST_BIN (gst_bin_new ("playbin-wrapper-bin"));
 
-  gst_bin_add (bin, src);
+  playbin = gst_element_factory_make ("playbin", "video-player");
 
-  dst = gst_element_factory_make ("intervideosink", "inter video sink");
-  if (!dst)
-    g_error ("Error creating intervideosink, missing dependency!");
-  g_object_set (dst,
+  /* Convert file path to URI */
+  uri = g_filename_to_uri (self->selected_video_file, NULL, NULL);
+  if (!uri) {
+    g_warning ("NdWindow: Failed to convert file path to URI: %s", self->selected_video_file);
+    gst_object_unref (bin);
+    return NULL;
+  }
+
+  g_object_set (playbin, "uri", uri, NULL);
+  g_free (uri);
+
+  /* Set up video sink */
+  videosink = gst_element_factory_make ("intervideosink", "inter video sink");
+  g_object_set (videosink,
                 "channel", "nd-inter-video",
-                "max-lateness", (gint64) - 1,
-                "sync", FALSE,
+                "max-lateness", (gint64) -1,
+                "sync", TRUE,
                 NULL);
-  gst_bin_add (bin, dst);
 
-  if (self->screencast_type == ND_SCREEN_CAST_SOURCE_TYPE_VIRTUAL)
-    {
-      /* Initial caps for virtual display */
-      caps = gst_caps_new_simple ("video/x-raw",
-                                  "max-framerate", GST_TYPE_FRACTION, 30, 1,
-                                  "width", G_TYPE_INT, 1920,
-                                  "height", G_TYPE_INT, 1080,
-                                  NULL);
-      filter = gst_element_factory_make ("capsfilter", "srcfilter");
-      gst_bin_add (bin, filter);
-      g_object_set (filter,
-                    "caps", caps,
-                    NULL);
-      g_clear_pointer (&caps, gst_caps_unref);
+  /* Set up audio sink for wireless display */
+  audiosink = gst_element_factory_make ("interaudiosink", "inter audio sink");
+  g_object_set (audiosink,
+                "channel", "nd-inter-audio",
+                "sync", TRUE,
+                NULL);
 
-      gst_element_link_many (src, filter, dst, NULL);
-    }
-  else
-    gst_element_link_many (src, dst, NULL);
+  /* Create a volume element to ensure proper audio levels */
+  GstElement *volume = gst_element_factory_make ("volume", "audio-volume");
+  GstElement *audiobin = gst_bin_new ("audio-bin");
 
+  if (volume && audiobin) {
+    /* Set volume to 100% (1.0) to ensure good audio levels */
+    g_object_set (volume, "volume", 1.0, NULL);
+
+    gst_bin_add_many (GST_BIN (audiobin), volume, audiosink, NULL);
+    gst_element_link (volume, audiosink);
+
+    /* Create ghost pad for the audio bin */
+    GstPad *sink_pad = gst_element_get_static_pad (volume, "sink");
+    gst_element_add_pad (audiobin, gst_ghost_pad_new ("sink", sink_pad));
+    gst_object_unref (sink_pad);
+
+    g_object_set (playbin,
+                  "video-sink", videosink,
+                  "audio-sink", audiobin,
+                  NULL);
+  } else {
+    /* Fallback to direct audio sink if volume element fails */
+    g_object_set (playbin,
+                  "video-sink", videosink,
+                  "audio-sink", audiosink,
+                  NULL);
+  }
+
+  gst_bin_add (bin, playbin);
+
+  /* Add probe to intervideosink sink pad */
+  GstPad *sinkpad = gst_element_get_static_pad (videosink, "sink");
+  if (sinkpad) {
+    gst_pad_add_probe (sinkpad,
+                       GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
+                       NULL,
+                       playbin, NULL);
+    gst_object_unref (sinkpad);
+  }
+
+  /* intervideosrc for output */
   res = gst_element_factory_make ("intervideosrc", "screencastsrc");
   g_object_set (res,
                 "do-timestamp", FALSE,
@@ -197,8 +182,7 @@ sink_create_source_cb (NdWindow * self, NdSink * sink)
 
   gst_element_add_pad (GST_ELEMENT (bin),
                        gst_ghost_pad_new ("src",
-                                          gst_element_get_static_pad (res,
-                                                                      "src")));
+                                          gst_element_get_static_pad (res, "src")));
 
   g_object_ref_sink (bin);
   return GST_ELEMENT (bin);
@@ -209,10 +193,24 @@ sink_create_audio_source_cb (NdWindow * self, NdSink * sink)
 {
   GstElement *res;
 
-  if (!self->pulse)
+  /* First, try to get audio from the video file via interaudiosrc */
+  res = gst_element_factory_make ("interaudiosrc", "inter audio src");
+  if (res) {
+    g_object_set (res,
+                  "channel", "nd-inter-audio",
+                  NULL);
+    g_debug ("NdWindow: Using inter audio source for video file audio");
+    return g_object_ref_sink (res);
+  }
+
+  /* Fallback to PulseAudio if inter audio source is not available */
+  if (!self->pulse) {
+    g_debug ("NdWindow: No PulseAudio available for audio source");
     return NULL;
+  }
 
   res = nd_pulseaudio_get_source (self->pulse);
+  g_debug ("NdWindow: Using PulseAudio source as fallback");
 
   return g_object_ref_sink (res);
 }
@@ -304,74 +302,154 @@ transform_str_is_set_to_bool (GBinding     *binding,
 }
 
 static void
-nd_screencast_started_cb (GObject      *source_object,
-                          GAsyncResult *result,
-                          gpointer      user_data)
+on_file_dialog_response (GObject *source_object,
+                         GAsyncResult *res,
+                         gpointer user_data)
 {
+  GtkFileDialog *dialog = GTK_FILE_DIALOG (source_object);
+  NdWindow *self = ND_WINDOW (user_data);
   g_autoptr(GError) error = NULL;
-  XdpSession *session = XDP_SESSION (source_object);
-  NdWindow *window = ND_WINDOW (user_data);
+  GFile *file;
 
-  if (!xdp_session_start_finish (session, result, &error))
-    {
-      if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-        {
-          g_warning ("Error initializing screencast portal: %s", error->message);
+  file = gtk_file_dialog_open_finish (dialog, res, &error);
 
-          /* Unknown method means the portal does not exist, give a slightly
-           * more specific warning then.
-           */
-          if (g_error_matches (error, G_DBUS_ERROR, G_DBUS_ERROR_UNKNOWN_METHOD))
-            g_warning ("Screencasting portal is unavailable! It is required to select the monitor to stream!");
+  if (file) {
+    g_free (self->selected_video_file);
+    self->selected_video_file = g_file_get_path (file);
+    g_object_unref (file);
 
-          g_warning ("Falling back to X11! You need to fix your setup to avoid issues (XDG Portals and/or mutter screencasting support)!");
-          window->use_x11 = TRUE;
-        }
+    g_debug ("NdWindow: Selected video file: %s", self->selected_video_file);
 
-      g_warning ("Failed to start screencast session: %s", error->message);
-      return;
+    /* Now proceed with streaming using the pending sink */
+    if (self->pending_sink) {
+      self->stream_sink = nd_sink_start_stream (self->pending_sink);
+
+      if (!self->stream_sink) {
+        g_warning ("NdWindow: Could not start streaming!");
+        g_clear_object (&self->pending_sink);
+        return;
+      }
+
+      g_signal_connect_object (self->stream_sink,
+                               "create-source",
+                               (GCallback) sink_create_source_cb,
+                               self,
+                               G_CONNECT_SWAPPED);
+
+      g_signal_connect_object (self->stream_sink,
+                               "create-audio-source",
+                               (GCallback) sink_create_audio_source_cb,
+                               self,
+                               G_CONNECT_SWAPPED);
+
+      g_signal_connect_object (self->stream_sink,
+                               "notify::state",
+                               (GCallback) sink_notify_state_cb,
+                               self,
+                               G_CONNECT_SWAPPED);
+
+      /* We might have moved into the error state in the meantime. */
+      sink_notify_state_cb (self, NULL, self->stream_sink);
+
+      g_ptr_array_add (self->sink_property_bindings,
+                       g_object_ref (g_object_bind_property (self->stream_sink,
+                                                             "missing-video-codec",
+                                                             self->codec_install_video,
+                                                             "codecs",
+                                                             G_BINDING_SYNC_CREATE)));
+
+      g_ptr_array_add (self->sink_property_bindings,
+                       g_object_ref (g_object_bind_property (self->stream_sink,
+                                                             "missing-audio-codec",
+                                                             self->codec_install_audio,
+                                                             "codecs",
+                                                             G_BINDING_SYNC_CREATE)));
+
+      g_ptr_array_add (self->sink_property_bindings,
+                       g_object_ref (g_object_bind_property_full (self->stream_sink,
+                                                                  "missing-firewall-zone",
+                                                                  self->error_firewall_zone,
+                                                                  "reveal-child",
+                                                                  G_BINDING_SYNC_CREATE,
+                                                                  transform_str_is_set_to_bool,
+                                                                  NULL,
+                                                                  NULL,
+                                                                  NULL)));
+
+      g_object_set (self->meta_provider, "discover", FALSE, NULL);
+      g_list_store_append (self->connect_sink_list_model, self->stream_sink);
+
+      g_clear_object (&self->pending_sink);
     }
-  g_debug ("Created screencast session");
+  } else {
+    /* User cancelled or error occurred, clean up pending sink */
+    if (error && !g_error_matches (error, GTK_DIALOG_ERROR, GTK_DIALOG_ERROR_CANCELLED))
+      g_warning ("NdWindow: Error opening file dialog: %s", error->message);
+    g_clear_object (&self->pending_sink);
+  }
 }
 
 static void
-session_closed_cb (NdWindow *self)
+show_file_chooser_dialog (NdWindow *self)
 {
-  g_debug ("Session closed");
-  if (self->stream_sink)
-    nd_sink_stop_stream (self->stream_sink);
+  GtkFileDialog *dialog;
+  GtkFileFilter *filter;
+  GListStore *filters;
 
-  g_clear_object (&self->session);
+  dialog = gtk_file_dialog_new ();
+  gtk_file_dialog_set_title (dialog, _("Select Video File"));
+
+  /* Create file filters */
+  filters = g_list_store_new (GTK_TYPE_FILE_FILTER);
+
+  /* Add video file filter */
+  filter = gtk_file_filter_new ();
+  gtk_file_filter_set_name (filter, _("Video files"));
+  gtk_file_filter_add_mime_type (filter, "video/*");
+
+  /* Add common video formats */
+  gtk_file_filter_add_pattern (filter, "*.mp4");
+  gtk_file_filter_add_pattern (filter, "*.avi");
+  gtk_file_filter_add_pattern (filter, "*.mkv");
+  gtk_file_filter_add_pattern (filter, "*.mov");
+  gtk_file_filter_add_pattern (filter, "*.wmv");
+  gtk_file_filter_add_pattern (filter, "*.flv");
+  gtk_file_filter_add_pattern (filter, "*.webm");
+  gtk_file_filter_add_pattern (filter, "*.ogv");
+  g_list_store_append (filters, filter);
+  g_object_unref (filter);
+
+  /* Add "All files" filter */
+  filter = gtk_file_filter_new ();
+  gtk_file_filter_set_name (filter, _("All files"));
+  gtk_file_filter_add_pattern (filter, "*");
+  g_list_store_append (filters, filter);
+  g_object_unref (filter);
+
+  gtk_file_dialog_set_filters (dialog, G_LIST_MODEL (filters));
+  g_object_unref (filters);
+
+  gtk_file_dialog_open (dialog,
+                        GTK_WINDOW (self),
+                        NULL, /* cancellable */
+                        on_file_dialog_response,
+                        self);
+
+  g_object_unref (dialog);
 }
 
 static void
-nd_screencast_init_cb (GObject      *source_object,
-                       GAsyncResult *result,
-                       gpointer      user_data)
+select_video_file_button_clicked_cb (NdWindow *self)
 {
-  g_autoptr(GError) error = NULL;
-  XdpPortal *portal = XDP_PORTAL (source_object);
-  NdWindow *window = ND_WINDOW (user_data);
-  XdpParent *parent = NULL;
+  show_file_chooser_dialog (self);
+}
 
-  window->portal = portal;
-  window->session = xdp_portal_create_screencast_session_finish (window->portal, result, &error);
-  if (window->session == NULL)
-    {
-      g_warning ("Failed to create screencast session: %s", error->message);
-      window->use_x11 = TRUE;
-      return;
-    }
-
-  g_signal_connect_object (window->session,
-                           "closed",
-                           (GCallback) session_closed_cb,
-                           window,
-                           G_CONNECT_SWAPPED);
-
-  parent = xdp_parent_new_gtk (GTK_WINDOW (window));
-  xdp_session_start (window->session, parent, NULL, nd_screencast_started_cb, window);
-  xdp_parent_free (parent);
+static void
+select_content_back_button_clicked_cb (NdWindow *self)
+{
+  /* Go back to device selection and clean up pending sink */
+  g_clear_object (&self->pending_sink);
+  gtk_stack_set_visible_child_name (self->step_stack, "find");
 }
 
 static void
@@ -379,86 +457,13 @@ find_sink_list_row_activated_cb (NdWindow *self, NdSinkRow *row, GtkListBox *sin
 {
   NdSink *sink;
 
-  if (!self->use_x11 && !self->portal)
-    {
-      g_warning ("Cannot start streaming right now as we don't have a portal!");
-      return;
-    }
-
-  if (!self->use_x11 && self->portal && !self->session)
-    {
-      xdp_portal_create_screencast_session (self->portal,
-                                            XDP_OUTPUT_MONITOR | XDP_OUTPUT_WINDOW | XDP_OUTPUT_VIRTUAL,
-                                            XDP_SCREENCAST_FLAG_NONE,
-                                            XDP_CURSOR_MODE_EMBEDDED,
-                                            XDP_PERSIST_MODE_NONE,
-                                            NULL,
-                                            self->cancellable,
-                                            nd_screencast_init_cb,
-                                            self);
-      g_debug ("NdWindow: Re-creating portal session!");
-      return;
-    }
-
   g_assert (ND_IS_SINK_ROW (row));
 
   sink = nd_sink_row_get_sink (row);
-  self->stream_sink = nd_sink_start_stream (sink);
 
-  if (!self->stream_sink)
-    {
-      g_warning ("NdWindow: Could not start streaming!");
-      return;
-    }
-
-  g_signal_connect_object (self->stream_sink,
-                           "create-source",
-                           (GCallback) sink_create_source_cb,
-                           self,
-                           G_CONNECT_SWAPPED);
-
-  g_signal_connect_object (self->stream_sink,
-                           "create-audio-source",
-                           (GCallback) sink_create_audio_source_cb,
-                           self,
-                           G_CONNECT_SWAPPED);
-
-  g_signal_connect_object (self->stream_sink,
-                           "notify::state",
-                           (GCallback) sink_notify_state_cb,
-                           self,
-                           G_CONNECT_SWAPPED);
-
-  /* We might have moved into the error state in the meantime. */
-  sink_notify_state_cb (self, NULL, self->stream_sink);
-
-  g_ptr_array_add (self->sink_property_bindings,
-                   g_object_ref (g_object_bind_property (self->stream_sink,
-                                                         "missing-video-codec",
-                                                         self->codec_install_video,
-                                                         "codecs",
-                                                         G_BINDING_SYNC_CREATE)));
-
-  g_ptr_array_add (self->sink_property_bindings,
-                   g_object_ref (g_object_bind_property (self->stream_sink,
-                                                         "missing-audio-codec",
-                                                         self->codec_install_audio,
-                                                         "codecs",
-                                                         G_BINDING_SYNC_CREATE)));
-
-  g_ptr_array_add (self->sink_property_bindings,
-                   g_object_ref (g_object_bind_property_full (self->stream_sink,
-                                                              "missing-firewall-zone",
-                                                              self->error_firewall_zone,
-                                                              "reveal-child",
-                                                              G_BINDING_SYNC_CREATE,
-                                                              transform_str_is_set_to_bool,
-                                                              NULL,
-                                                              NULL,
-                                                              NULL)));
-
-  g_object_set (self->meta_provider, "discover", FALSE, NULL);
-  g_list_store_append (self->connect_sink_list_model, self->stream_sink);
+  /* Store the sink for later use and show content selection page */
+  self->pending_sink = g_object_ref (sink);
+  gtk_stack_set_visible_child_name (self->step_stack, "select-content");
 }
 
 static void
@@ -513,23 +518,22 @@ gnome_nd_window_finalize (GObject *obj)
 
   g_cancellable_cancel (self->cancellable);
   g_clear_object (&self->cancellable);
-  nd_pulseaudio_unload(self->pulse);
-  g_clear_object (&self->portal);
-  g_clear_object (&self->pulse);
+
+  /* Clean up PulseAudio properly to remove Network-Displays sink */
+  if (self->pulse) {
+    nd_pulseaudio_unload (self->pulse);
+    g_clear_object (&self->pulse);
+  }
 
   g_clear_object (&self->stream_sink);
+  g_clear_object (&self->pending_sink);
+  g_free (self->selected_video_file);
 
   g_clear_object (&self->meta_provider);
   g_clear_object (&self->nm_device_registry);
   g_clear_object (&self->avahi_client);
 
   g_clear_pointer (&self->sink_property_bindings, g_ptr_array_unref);
-
-  if (self->session)
-    xdp_session_close (self->session);
-
-  if (self->session)
-    g_clear_object (&self->session);
 
   G_OBJECT_CLASS (gnome_nd_window_parent_class)->finalize (obj);
 }
@@ -560,6 +564,8 @@ gnome_nd_window_class_init (NdWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, NdWindow, has_providers_stack);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, step_stack);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, find_sink_list);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, select_video_file_button);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, select_content_back_button);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, connect_sink_list);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, connect_state_label);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, connect_cancel);
@@ -626,6 +632,10 @@ gnome_nd_window_init (NdWindow *self)
 
   gtk_widget_init_template (GTK_WIDGET (self));
 
+  /* Initialize new fields */
+  self->pending_sink = NULL;
+  self->selected_video_file = NULL;
+
   self->meta_provider = nd_meta_provider_new ();
   g_signal_connect_object (self->meta_provider,
                            "notify::has-providers",
@@ -667,6 +677,19 @@ gnome_nd_window_init (NdWindow *self)
                            self,
                            G_CONNECT_SWAPPED);
 
+  /* Connect content selection page signals */
+  g_signal_connect_object (self->select_video_file_button,
+                           "clicked",
+                           (GCallback) select_video_file_button_clicked_cb,
+                           self,
+                           G_CONNECT_SWAPPED);
+
+  g_signal_connect_object (self->select_content_back_button,
+                           "clicked",
+                           (GCallback) select_content_back_button_clicked_cb,
+                           self,
+                           G_CONNECT_SWAPPED);
+
   self->cancellable = g_cancellable_new ();
 
   /* All of these buttons just stop the stream, which will return us
@@ -688,28 +711,6 @@ gnome_nd_window_init (NdWindow *self)
                            (GCallback) stream_stop_clicked_cb,
                            self,
                            G_CONNECT_SWAPPED);
-
-  self->portal = xdp_portal_initable_new (&error);
-  if (error)
-    {
-      g_warning ("Failed to create screencast portal: %s", error->message);
-      self->use_x11 = TRUE;
-      g_clear_object (&self->portal);
-    }
-
-  if (self->portal)
-    {
-      xdp_portal_create_screencast_session (self->portal,
-                                            XDP_OUTPUT_MONITOR | XDP_OUTPUT_WINDOW | XDP_OUTPUT_VIRTUAL,
-                                            XDP_SCREENCAST_FLAG_NONE,
-                                            XDP_CURSOR_MODE_EMBEDDED,
-                                            XDP_PERSIST_MODE_NONE,
-                                            NULL,
-                                            self->cancellable,
-                                            nd_screencast_init_cb,
-                                            self);
-      g_debug ("NdWindow: Creating portal session!");
-    }
 
   pulse = nd_pulseaudio_new ();
   g_async_initable_init_async (G_ASYNC_INITABLE (pulse),
