@@ -809,7 +809,7 @@ gnome_nd_window_class_init (NdWindowClass *klass)
 
   ND_TYPE_CODEC_INSTALL;
 
-  gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/NetworkDisplays/nd-window.ui");
+  gtk_widget_class_set_template_from_resource (widget_class, "/io/furios/WiDiStream/nd-window.ui");
   gtk_widget_class_bind_template_child (widget_class, NdWindow, has_providers_stack);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, step_stack);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, find_sink_list);
