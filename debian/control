@@ -1,8 +1,7 @@
-Source: gnome-network-displays
+Source: widistream
 Section: gnome
 Priority: optional
-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
-Uploaders: Matthias Geiger <werdahias@debian.org>
+Maintainer: Bardia Moshiri <bardia@furilabs.com>
 Rules-Requires-Root: no
 Build-Depends: debhelper-compat (= 13),
                appstream,
@@ -17,24 +16,23 @@ Build-Depends: debhelper-compat (= 13),
                libgtk-4-dev,
                libjson-glib-dev (>= 1.0),
                libnm-dev (>= 1.15),
-               libportal-gtk4-dev (>= 0.7),
                libprotobuf-c-dev (>= 1.0),
                libpulse-dev,
                libsoup-3.0-dev (>= 3.0),
                meson (>= 0.59.0)
 Standards-Version: 4.7.0
-Homepage: https://gitlab.gnome.org/GNOME/gnome-network-displays
-Vcs-Browser: https://salsa.debian.org/gnome-team/gnome-network-displays
-Vcs-Git: https://salsa.debian.org/gnome-team/gnome-network-displays.git
+Homepage: https://github.com/furilabs/widistream
+Vcs-Browser: https://github.com/furilabs/widistream
+Vcs-Git: https://github.com/furilabs/widistream
 
-Package: gnome-network-displays
+Package: widistream
 Architecture: any
 Depends: network-manager,
          wpasupplicant | iwd,
          ${misc:Depends},
          ${shlibs:Depends}
-Description: screencasting app for the GNOME desktop
- GNOME Network Displays allows you to stream your display and audio
+Description: Wireless screen broadcasting app
+ WiDiStream allows you to stream video files
  to other devices via Wi-Fi using the Miracast and Chromecast protocols.
  .
  Note: wpasupplicant or iwd are required.
