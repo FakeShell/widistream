@@ -1,1 +1,1 @@
-i18n.gettext('gnome-network-displays', preset: 'glib')
+i18n.gettext('widistream', preset: 'glib')

@@ -1,4 +1,4 @@
-project('gnome-network-displays', 'c',
+project('widistream', 'c',
   version: '0.96.0',
   meson_version: '>= 0.59.0',
 )
@@ -11,7 +11,7 @@ icondir = join_paths(datadir, 'icons')
 
 config_h = configuration_data()
 config_h.set_quoted('PACKAGE_VERSION', meson.project_version())
-config_h.set_quoted('GETTEXT_PACKAGE', 'gnome-network-displays')
+config_h.set_quoted('GETTEXT_PACKAGE', 'widistream')
 config_h.set_quoted('LOCALEDIR', join_paths(get_option('prefix'), get_option('localedir')))
 configure_file(
   output: 'gnome-network-displays-config.h',
@@ -19,7 +19,7 @@ configure_file(
 )
 add_project_arguments([
   '-I' + meson.current_build_dir(),
-  '-DG_LOG_DOMAIN="Gnd"',
+  '-DG_LOG_DOMAIN="WiDiStream"',
 ], language: 'c')
 
 enable_firewalld_zone = get_option('firewalld_zone')

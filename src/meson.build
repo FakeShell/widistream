@@ -1,4 +1,3 @@
-
 subdir('wfd')
 subdir('cc')
 
@@ -44,7 +43,6 @@ gnome_nd_deps = [
   dependency('gstreamer-rtsp-server-1.0'),
   dependency('gtk4'),
   dependency('libnm', version: '>= 1.15'),
-  dependency('libportal-gtk4', version: '>= 0.7'),
   dependency('libpulse-mainloop-glib'),
   dependency('libadwaita-1', version: '>= 1.0.0'),
 ]
@@ -57,7 +55,7 @@ gnome_nd_sources += gnome.compile_resources('gnome-nd-resources',
   c_name: 'gnome_screencast'
 )
 
-executable('gnome-network-displays',
+executable('widistream',
   gnome_nd_sources,
   dependencies: gnome_nd_deps,
   install: true,
