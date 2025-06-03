@@ -6,7 +6,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: gnome-network-displays master\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/gnome-network-displays/"
+"Report-Msgid-Bugs-To: https://github.com/furilabs/widistream"
 "issues/\n"
 "POT-Creation-Date: 2024-08-07 14:38+0000\n"
 "PO-Revision-Date: 2024-08-25 13:09+0300\n"
@@ -19,18 +19,18 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 3.4.4\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7 src/main.c:68
-msgid "GNOME Network Displays"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:7 src/main.c:68
+msgid "WiDiStream Network Displays"
 msgstr "Gnomen verkkonäytöt"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:8
-msgid "Screencasting for GNOME"
+#: data/io.furios.WiDiStream.appdata.xml.in:8
+msgid "Screencasting for WiDiStream"
 msgstr "Näyttöpeilausta Gnomelle"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:24
+#: data/io.furios.WiDiStream.appdata.xml.in:24
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Supports the Miracast and Chromecast protocols."
 msgstr ""
 "Gnome-verkkonäytöt mahdollistaa työpöydän suoratoistamisen etänäyttöön. "

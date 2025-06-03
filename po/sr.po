@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: gnome-network-displays master\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/gnome-network-displays/"
+"Report-Msgid-Bugs-To: https://github.com/furilabs/widistream"
 "issues\n"
 "POT-Creation-Date: 2021-01-12 22:26+0000\n"
 "PO-Revision-Date: 2021-02-05 16:49+0200\n"
@@ -19,18 +19,18 @@ msgstr ""
 "%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
 "X-Project-Style: gnome\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:6
-msgid "GNOME Network Displays"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:6
+msgid "WiDiStream Network Displays"
 msgstr "Гномов екран на мрежи"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7
+#: data/io.furios.WiDiStream.appdata.xml.in:7
 msgid "Stream the desktop to Wi-Fi Display capable devices"
 msgstr "Преточите радну површ на уређаје са могућношћу бежичног приказа"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:16
+#: data/io.furios.WiDiStream.appdata.xml.in:16
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Currently implemented is support for casting to Wi-Fi Display capable "
 "devices (a.k.a. Miracast)."
 msgstr ""

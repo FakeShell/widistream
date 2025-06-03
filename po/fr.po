@@ -19,23 +19,23 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1)\n"
 "X-Generator: Gtranslator 3.36.0\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:6
-msgid "GNOME Network Displays"
-msgstr "Affichages Réseau GNOME"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:6
+msgid "WiDiStream Network Displays"
+msgstr "Affichages Réseau WiDiStream"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7
+#: data/io.furios.WiDiStream.appdata.xml.in:7
 msgid "Stream the desktop to Wi-Fi Display capable devices"
 msgstr ""
 "Diffusez le bureau sur des appareils compatibles avec l'affichage via Wi-Fi"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:16
+#: data/io.furios.WiDiStream.appdata.xml.in:16
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Currently implemented is support for casting to Wi-Fi Display capable "
 "devices (a.k.a. Miracast)."
 msgstr ""
-"Affichages Réseau GNOME vous permet de diffuser votre bureau sur un "
+"Affichages Réseau WiDiStream vous permet de diffuser votre bureau sur un "
 "affichage distant. Actuellement, seule la diffusion sur des appareils "
 "compatibles avec l'affichage via Wi-Fi (alias Miracast) est prise en charge."
 

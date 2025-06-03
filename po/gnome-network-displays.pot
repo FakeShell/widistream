@@ -17,22 +17,22 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7 src/main.c:68
-msgid "GNOME Network Displays"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:7 src/main.c:68
+msgid "WiDiStream Network Displays"
 msgstr ""
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:8
-msgid "Screencasting for GNOME"
+#: data/io.furios.WiDiStream.appdata.xml.in:8
+msgid "Screencasting for WiDiStream"
 msgstr ""
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:14
+#: data/io.furios.WiDiStream.appdata.xml.in:14
 msgid "Benjamin Berg, Christian Glombek"
 msgstr ""
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:24
+#: data/io.furios.WiDiStream.appdata.xml.in:24
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Supports the Miracast and Chromecast protocols."
 msgstr ""
 

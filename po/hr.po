@@ -6,7 +6,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: gnome-network-displays master\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/gnome-network-displays/"
+"Report-Msgid-Bugs-To: https://github.com/furilabs/widistream"
 "issues\n"
 "POT-Creation-Date: 2020-08-30 21:38+0000\n"
 "PO-Revision-Date: 2020-09-13 17:44+0200\n"
@@ -20,22 +20,22 @@ msgstr ""
 "Last-Translator: gogo <trebelnik2@gmail.com>\n"
 "X-Generator: Poedit 2.3\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:6
-msgid "GNOME Network Displays"
-msgstr "GNOME mrežni zasloni"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:6
+msgid "WiDiStream Network Displays"
+msgstr "WiDiStream mrežni zasloni"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7
+#: data/io.furios.WiDiStream.appdata.xml.in:7
 msgid "Stream the desktop to Wi-Fi Display capable devices"
 msgstr "Emitirajte prikaz radne površine na bežične zaslone"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:16
+#: data/io.furios.WiDiStream.appdata.xml.in:16
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Currently implemented is support for casting to Wi-Fi Display capable "
 "devices (a.k.a. Miracast)."
 msgstr ""
-"GNOME mrežni zasloni omogućuju vam emitiranje vaše radne površine na "
+"WiDiStream mrežni zasloni omogućuju vam emitiranje vaše radne površine na "
 "udaljeni zaslon. Trenutno je implementirana podrška emitiranja na bežične "
 "zaslone (poznata kao Miracast)"
 

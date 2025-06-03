@@ -6,7 +6,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: gnome-network-displays master\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/gnome-network-displays/"
+"Report-Msgid-Bugs-To: https://github.com/furilabs/widistream"
 "issues/\n"
 "POT-Creation-Date: 2024-08-07 14:38+0000\n"
 "PO-Revision-Date: 2024-10-28 21:50+0100\n"
@@ -18,21 +18,21 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 2.4.2\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7 src/main.c:68
-msgid "GNOME Network Displays"
-msgstr "Pantalles per xarxa del GNOME"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:7 src/main.c:68
+msgid "WiDiStream Network Displays"
+msgstr "Pantalles per xarxa del WiDiStream"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:8
-msgid "Screencasting for GNOME"
-msgstr "Projecció de pantalla del GNOME"
+#: data/io.furios.WiDiStream.appdata.xml.in:8
+msgid "Screencasting for WiDiStream"
+msgstr "Projecció de pantalla del WiDiStream"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:24
+#: data/io.furios.WiDiStream.appdata.xml.in:24
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Supports the Miracast and Chromecast protocols."
 msgstr ""
-"El Pantalles per xarxa del GNOME us permet enviar l'escriptori a una "
+"El Pantalles per xarxa del WiDiStream us permet enviar l'escriptori a una "
 "pantalla remota. És compatible amb els protocols Miracast i Chromecast."
 
 #: src/nd-codec-install.c:60

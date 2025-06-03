@@ -6,7 +6,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: gnome-network-displays master\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/gnome-network-displays/issues\n"
+"Report-Msgid-Bugs-To: https://github.com/furilabs/widistreamissues\n"
 "POT-Creation-Date: 2023-01-09 19:03+0000\n"
 "PO-Revision-Date: 2023-01-18 09:52+0000\n"
 "Last-Translator: Fabio T. <f.t.public@gmail.com>\n"
@@ -17,22 +17,22 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Editor: HaiPO 1.4 beta\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:6
-msgid "GNOME Network Displays"
-msgstr "Visôrs in rêt di GNOME"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:6
+msgid "WiDiStream Network Displays"
+msgstr "Visôrs in rêt di WiDiStream"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7
+#: data/io.furios.WiDiStream.appdata.xml.in:7
 msgid "Stream the desktop to Wi-Fi Display capable devices"
 msgstr "Trasmet il scritori su dispositîfs “Wi-Fi Display” compatibii"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:16
+#: data/io.furios.WiDiStream.appdata.xml.in:16
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Currently implemented is support for casting to Wi-Fi Display capable "
 "devices (a.k.a. Miracast)."
 msgstr ""
-"Visôrs in rêt di GNOME ti permet di trasmeti il to scritori suntun visôr "
+"Visôrs in rêt di WiDiStream ti permet di trasmeti il to scritori suntun visôr "
 "lontan. Pal moment al è implementât il supuart pe trasmission sui "
 "dispositîfs compatibii cun Wi-Fi Display (cognossûts come Miracast)."
 

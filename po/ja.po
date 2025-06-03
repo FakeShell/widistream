@@ -17,23 +17,23 @@ msgstr ""
 "Language-Team: \n"
 "X-Generator: Poedit 2.3\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:6
-msgid "GNOME Network Displays"
-msgstr "GNOME ネットワークディスプレイ\t"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:6
+msgid "WiDiStream Network Displays"
+msgstr "WiDiStream ネットワークディスプレイ\t"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7
+#: data/io.furios.WiDiStream.appdata.xml.in:7
 msgid "Stream the desktop to Wi-Fi Display capable devices"
 msgstr ""
 "デスクトップをWi-Fiディスプレイに対応しているデバイスへストリーム配信\tします"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:16
+#: data/io.furios.WiDiStream.appdata.xml.in:16
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Currently implemented is support for casting to Wi-Fi Display capable "
 "devices (a.k.a. Miracast)."
 msgstr ""
-"GNOMEネットワークディスプレイは、あなたのデスクトップをリモートのディスプレイ"
+"WiDiStreamネットワークディスプレイは、あなたのデスクトップをリモートのディスプレイ"
 "に配信することができます。現在、Wi-Fi ディスプレイ対応デバイス(別名 "
 "Miracast, ミラーリング)に対応しています。"
 

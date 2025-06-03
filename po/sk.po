@@ -6,7 +6,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: gnome-network-displays master\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/gnome-network-displays/issues\n"
+"Report-Msgid-Bugs-To: https://github.com/furilabs/widistreamissues\n"
 "POT-Creation-Date: 2020-10-13 15:33+0000\n"
 "PO-Revision-Date: 2021-07-26 09:04+0200\n"
 "Last-Translator: Jose Riha <jose1711@gmail.com>\n"
@@ -18,19 +18,19 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
 "X-Generator: Poedit 3.0\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3 data/org.gnome.NetworkDisplays.appdata.xml.in:6
-msgid "GNOME Network Displays"
-msgstr "Sieťové displeje GNOME"
+#: data/io.furios.WiDiStream.desktop.in:3 data/io.furios.WiDiStream.appdata.xml.in:6
+msgid "WiDiStream Network Displays"
+msgstr "Sieťové displeje WiDiStream"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7
+#: data/io.furios.WiDiStream.appdata.xml.in:7
 msgid "Stream the desktop to Wi-Fi Display capable devices"
 msgstr "Vysielajte svoju plochu na zariadenie s podporou displejov Wi-Fi"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:16
+#: data/io.furios.WiDiStream.appdata.xml.in:16
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. Currently implemented is support for casting to Wi-Fi Display capable devices (a.k.a. Miracast)."
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. Currently implemented is support for casting to Wi-Fi Display capable devices (a.k.a. Miracast)."
 msgstr ""
-"Sieťové displeje GNOME vám umožnia vysielať aktivitu na vašej ploche na vzdialený displej. V súčasnosti je implementovaná podpora pre vysielanie na zariadenia s podporou "
+"Sieťové displeje WiDiStream vám umožnia vysielať aktivitu na vašej ploche na vzdialený displej. V súčasnosti je implementovaná podpora pre vysielanie na zariadenia s podporou "
 "displejov Wi-Fi (tiež známe ako Miracast)."
 
 #: src/nd-codec-install.c:54

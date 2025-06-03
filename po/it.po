@@ -18,22 +18,22 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 1.8.7.1\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:6
-msgid "GNOME Network Displays"
-msgstr "GNOME Network Displays"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:6
+msgid "WiDiStream Network Displays"
+msgstr "WiDiStream Network Displays"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7
+#: data/io.furios.WiDiStream.appdata.xml.in:7
 msgid "Stream the desktop to Wi-Fi Display capable devices"
 msgstr "Trasmetti il desktop ai dispositivi compatibili con Wi-Fi Display"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:16
+#: data/io.furios.WiDiStream.appdata.xml.in:16
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Currently implemented is support for casting to Wi-Fi Display capable "
 "devices (a.k.a. Miracast)."
 msgstr ""
-"GNOME Network Display ti consente di trasmettere il tuo desktop a un display "
+"WiDiStream Network Display ti consente di trasmettere il tuo desktop a un display "
 "remoto. Attualmente è implementato il supporto per il casting su dispositivi "
 "compatibili con Wi-Fi Display (a.k.a. Miracast)."
 
@@ -153,5 +153,5 @@ msgid ""
 "administrator."
 msgstr ""
 
-#~ msgid "org.gnome.NetworkDisplays"
-#~ msgstr "org.gnome.NetworkDisplays"
+#~ msgid "io.furios.WiDiStream"
+#~ msgstr "io.furios.WiDiStream"

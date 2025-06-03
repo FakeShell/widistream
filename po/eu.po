@@ -5,7 +5,7 @@
 #
 msgid ""
 msgstr "Project-Id-Version: gnome-network-displays master\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/gnome-network-displays/issues/\n"
+"Report-Msgid-Bugs-To: https://github.com/furilabs/widistreamissues/\n"
 "POT-Creation-Date: 2024-01-30 19:30+0000\n"
 "PO-Revision-Date: 2024-03-09 10:00+0100\n"
 "Last-Translator: Asier Sarasua Garmendia <asier.sarasua@ni.eus>\n"
@@ -15,20 +15,20 @@ msgstr "Project-Id-Version: gnome-network-displays master\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7 src/main.c:68
-msgid "GNOME Network Displays"
-msgstr "GNOME Sareko Bistaratzeak"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:7 src/main.c:68
+msgid "WiDiStream Network Displays"
+msgstr "WiDiStream Sareko Bistaratzeak"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:8
-msgid "Screencasting for GNOME"
-msgstr "Partekatu pantaila GNOMEn"
+#: data/io.furios.WiDiStream.appdata.xml.in:8
+msgid "Screencasting for WiDiStream"
+msgstr "Partekatu pantaila WiDiStreamn"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:25
+#: data/io.furios.WiDiStream.appdata.xml.in:25
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Supports the Miracast and Chromecast protocols."
-msgstr "GNOME Sareko Bistaratzeak aplikazioaren bidez, mahaigaina urruneko pantaila batean bistaratu daiteke. Miracast eta Chromecast protokoloak onartzen ditu."
+msgstr "WiDiStream Sareko Bistaratzeak aplikazioaren bidez, mahaigaina urruneko pantaila batean bistaratu daiteke. Miracast eta Chromecast protokoloak onartzen ditu."
 
 #: src/nd-codec-install.c:59
 #, c-format

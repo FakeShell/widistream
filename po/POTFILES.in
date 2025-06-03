@@ -1,5 +1,5 @@
-data/org.gnome.NetworkDisplays.desktop.in
-data/org.gnome.NetworkDisplays.appdata.xml.in
+data/io.furios.WiDiStream.desktop.in
+data/io.furios.WiDiStream.appdata.xml.in
 src/app/main.c
 src/app/nd-codec-install.c
 src/app/nd-window.c

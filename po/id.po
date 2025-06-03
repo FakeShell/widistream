@@ -6,7 +6,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: gnome-network-displays master\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/gnome-network-displays/"
+"Report-Msgid-Bugs-To: https://github.com/furilabs/widistream"
 "issues\n"
 "POT-Creation-Date: 2020-07-29 21:08+0000\n"
 "PO-Revision-Date: 2020-08-16 14:31+0700\n"
@@ -20,22 +20,22 @@ msgstr ""
 "X-Generator: Poedit 2.4.1\n"
 "X-Poedit-SourceCharset: UTF-8\n"
 
-#: data/org.gnome.NetworkDisplays.desktop.in:3
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:6
-msgid "GNOME Network Displays"
-msgstr "Tampilan Jaringan GNOME"
+#: data/io.furios.WiDiStream.desktop.in:3
+#: data/io.furios.WiDiStream.appdata.xml.in:6
+msgid "WiDiStream Network Displays"
+msgstr "Tampilan Jaringan WiDiStream"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:7
+#: data/io.furios.WiDiStream.appdata.xml.in:7
 msgid "Stream the desktop to Wi-Fi Display capable devices"
 msgstr "Streaming desktop ke perangkat berkemampuan Display Wi-Fi"
 
-#: data/org.gnome.NetworkDisplays.appdata.xml.in:16
+#: data/io.furios.WiDiStream.appdata.xml.in:16
 msgid ""
-"GNOME Network Displays allows you to cast your desktop to a remote display. "
+"WiDiStream Network Displays allows you to cast your desktop to a remote display. "
 "Currently implemented is support for casting to Wi-Fi Display capable "
 "devices (a.k.a. Miracast)."
 msgstr ""
-"Tampilan Jaringan GNOME memungkinkan Anda untuk menyorot desktop Anda ke "
+"Tampilan Jaringan WiDiStream memungkinkan Anda untuk menyorot desktop Anda ke "
 "layar jauh. Yang saat ini diimplementasikan adalah dukungan untuk penyorotan "
 "bagi peranti berkemampuan Tampilan Wi-Fi (alias Miracast)."
 
