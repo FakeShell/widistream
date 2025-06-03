@@ -118,8 +118,8 @@ create_wfd_zone (GTask *task, GDBusConnection *connection)
    *     ( "icmp_block_inversion", False ),             # b
    */
   g_variant_builder_add (&builder, "s", "");
-  g_variant_builder_add (&builder, "s", "GNOME Network Displays WiFi-Display");
-  g_variant_builder_add (&builder, "s", "A zone intended to be used by GNOME Network Displays when establishing P2P connections to Wi-Fi Display (Miracast) sinks.");
+  g_variant_builder_add (&builder, "s", "WidiStream WiFi-Display");
+  g_variant_builder_add (&builder, "s", "A zone intended to be used by WiDiStream when establishing P2P connections to Wi-Fi Display (Miracast) sinks.");
   g_variant_builder_add (&builder, "b", FALSE);
   g_variant_builder_add (&builder, "s", "ACCEPT"); /* Target name */
 

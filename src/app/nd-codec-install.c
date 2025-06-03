@@ -222,7 +222,7 @@ on_row_activated_cb (NdCodecInstall *self, GtkListBoxRow *row)
   GstMessage *msg;
 
   ctx = gst_install_plugins_context_new ();
-  gst_install_plugins_context_set_desktop_id (ctx, "org.gnome.NetworkDisplays");
+  gst_install_plugins_context_set_desktop_id (ctx, "io.furios.WiDiStream");
 
   elem = gst_pipeline_new ("dummy");
   msg = gst_missing_element_message_new (elem, g_object_get_data (G_OBJECT (row), "codec"));
@@ -249,7 +249,7 @@ on_row_activated_cb (NdCodecInstall *self, GtkListBoxRow *row)
       g_variant_builder_add (&params, "s", desc);
       g_variant_builder_close (&params);
       g_variant_builder_add (&params, "s", "");
-      g_variant_builder_add (&params, "s", "org.gnome.NetworkDisplays");
+      g_variant_builder_add (&params, "s", "io.furios.WiDiStream");
       g_variant_builder_open (&params, G_VARIANT_TYPE ("a{sv}"));
       g_variant_builder_close (&params);
 

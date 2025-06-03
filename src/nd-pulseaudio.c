@@ -4,7 +4,7 @@
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (pa_proplist, pa_proplist_free)
 
-#define ND_PA_SINK "gnome_network_displays"
+#define ND_PA_SINK "widistream"
 #define ND_PA_MONITOR ND_PA_SINK ".monitor"
 
 struct _NdPulseaudio
@@ -249,8 +249,8 @@ nd_pulseaudio_async_initable_init_async (GAsyncInitable     *initable,
   self->mainloop_api = pa_threaded_mainloop_get_api(self->mainloop);
 
   proplist = pa_proplist_new ();
-  pa_proplist_sets (proplist, PA_PROP_APPLICATION_NAME, "GNOME Network Displays");
-  pa_proplist_sets (proplist, PA_PROP_APPLICATION_ID, "org.gnome.NetworkDisplays");
+  pa_proplist_sets (proplist, PA_PROP_APPLICATION_NAME, "WiDiStream");
+  pa_proplist_sets (proplist, PA_PROP_APPLICATION_ID, "io.furios.WiDiStream");
   /* pa_proplist_sets (proplist, PA_PROP_APPLICATION_ICON_NAME, ); */
 
   self->context = pa_context_new_with_proplist (self->mainloop_api, NULL, proplist);
@@ -350,7 +350,7 @@ nd_pulseaudio_get_source (NdPulseaudio *self)
 
   g_object_set (src,
                 "device", ND_PA_MONITOR,
-                "client-name", "GNOME Network Displays Audio Grabber",
+                "client-name", "WiDiStream Audio Grabber",
                 "do-timestamp", TRUE,
                 "server", pa_context_get_server (self->context),
                 NULL);

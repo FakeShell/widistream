@@ -1,8 +1,8 @@
 subdir('icons')
 
 desktop_file = i18n.merge_file(
-  input: 'org.gnome.NetworkDisplays.desktop.in',
-  output: 'org.gnome.NetworkDisplays.desktop',
+  input: 'io.furios.WiDiStream.desktop.in',
+  output: 'io.furios.WiDiStream.desktop',
   type: 'desktop',
   po_dir: '../po',
   install: true,
@@ -13,24 +13,6 @@ desktop_utils = find_program('desktop-file-validate', required: false)
 if desktop_utils.found()
   test('Validate desktop file', desktop_utils,
     args: [desktop_file]
-  )
-endif
-
-appstream_file = i18n.merge_file(
-  input: 'org.gnome.NetworkDisplays.appdata.xml.in',
-  output: 'org.gnome.NetworkDisplays.appdata.xml',
-  po_dir: '../po',
-  install: true,
-  install_dir: join_paths(get_option('datadir'), 'metainfo')
-)
-
-appstreamcli = find_program('appstreamcli', required: false)
-if appstreamcli.found()
-  test(
-    'validate-metainfo', appstreamcli,
-    args: [
-      'validate', '--no-net', '--explain', appstream_file.full_path()
-    ]
   )
 endif
 

@@ -3,8 +3,8 @@
   <template class="NdWindow" parent="AdwApplicationWindow">
     <property name="default-width">480</property>
     <property name="default-height">360</property>
-    <property name="title" translatable="yes">Network Displays</property>
-    <property name="icon-name">org.gnome.NetworkDisplays</property>
+    <property name="title" translatable="yes">WiDiStream</property>
+    <property name="icon-name">io.furios.WiDiStream</property>
     <property name="content">
       <object class="AdwToolbarView">
         <child type="top">

@@ -60,12 +60,12 @@ main (int   argc,
    * desktop features such as file opening and single-instance applications.
    */
 #if GLIB_CHECK_VERSION (2, 74, 0)
-  app = adw_application_new ("org.gnome.NetworkDisplays", G_APPLICATION_DEFAULT_FLAGS);
+  app = adw_application_new ("io.furios.WiDiStream", G_APPLICATION_DEFAULT_FLAGS);
 #else
-  app = adw_application_new ("org.gnome.NetworkDisplays", G_APPLICATION_FLAGS_NONE);
+  app = adw_application_new ("io.furios.WiDiStream", G_APPLICATION_FLAGS_NONE);
 #endif
 
-  g_set_application_name (_("GNOME Network Displays"));
+  g_set_application_name ("WiDiStream");
 
   /*
    * We connect to the activate signal to create a window when the application
