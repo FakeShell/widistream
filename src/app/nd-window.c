@@ -176,7 +176,7 @@ stop_x11_session (NdWindow *self)
 static GstElement *
 create_x11_source (NdWindow *self)
 {
-  GstElement *source, *videoscale, *videoconvert;
+  GstElement *source, *videoscale, *videoconvert, *queue;
   GstBin *bin;
   GstCaps *caps;
 
@@ -198,28 +198,46 @@ create_x11_source (NdWindow *self)
   /* Configure ximagesrc for our X11 display */
   g_object_set (source,
                 "display-name", self->x11_display,
-                "use-damage", FALSE,  /* Capture full frames */
+                "use-damage", TRUE,
                 "show-pointer", TRUE,
+                "do-timestamp", TRUE,
+                NULL);
+
+  /* Add a small queue to prevent blocking but allow some buffering */
+  queue = gst_element_factory_make ("queue", "x11-queue");
+  g_object_set (queue,
+                "max-size-buffers", 5,     /* Allow a few more buffers */
+                "max-size-bytes", 0,
+                "max-size-time", 0,
+                "leaky", 2,                /* Drop old buffers */
                 NULL);
 
   /* Add video conversion and scaling */
   videoconvert = gst_element_factory_make ("videoconvert", "x11-convert");
   videoscale = gst_element_factory_make ("videoscale", "x11-scale");
 
-  if (!videoconvert || !videoscale) {
+  if (!videoconvert || !videoscale || !queue) {
     g_warning ("Failed to create video processing elements");
     gst_object_unref (bin);
     return NULL;
   }
 
+  g_object_set (videoconvert,
+                "n-threads", 0,            /* Use all available threads */
+                NULL);
+  g_object_set (videoscale,
+                "method", 0,               /* Nearest neighbor (fastest) */
+                NULL);
+
   /* Add elements to bin */
-  gst_bin_add_many (bin, source, videoconvert, videoscale, NULL);
+  gst_bin_add_many (bin, source, queue, videoconvert, videoscale, NULL);
 
   /* Create caps for consistent output */
   caps = gst_caps_from_string ("video/x-raw,width=1920,height=1080,framerate=30/1");
 
   /* Link elements */
-  if (!gst_element_link (source, videoconvert) ||
+  if (!gst_element_link (source, queue) ||
+      !gst_element_link (queue, videoconvert) ||
       !gst_element_link_filtered (videoconvert, videoscale, caps)) {
     g_warning ("Failed to link X11 source elements");
     gst_caps_unref (caps);
@@ -262,15 +280,22 @@ create_video_file_source (NdWindow *self)
     return NULL;
   }
 
-  g_object_set (playbin, "uri", uri, NULL);
+  /* Configure playbin for reduced buffering but keep timing */
+  g_object_set (playbin,
+                "uri", uri,
+                "buffer-size", 2048,       /* Moderate buffer size */
+                "buffer-duration", 1000000000, /* 1 second buffer */
+                NULL);
   g_free (uri);
 
   /* Set up video sink */
   videosink = gst_element_factory_make ("intervideosink", "inter video sink");
   g_object_set (videosink,
                 "channel", "nd-inter-video",
-                "max-lateness", (gint64) -1,
+                "max-lateness", (gint64) 33333333,  /* Drop frames older than ~33ms (2 frames) */
                 "sync", TRUE,
+                "async", FALSE,
+                "qos", TRUE,
                 NULL);
 
   /* Set up audio sink for wireless display */
@@ -278,6 +303,7 @@ create_video_file_source (NdWindow *self)
   g_object_set (audiosink,
                 "channel", "nd-inter-audio",
                 "sync", TRUE,
+                "async", FALSE,
                 NULL);
 
   /* Create a volume element to ensure proper audio levels */
@@ -323,8 +349,8 @@ create_video_file_source (NdWindow *self)
   /* intervideosrc for output */
   res = gst_element_factory_make ("intervideosrc", "screencastsrc");
   g_object_set (res,
-                "do-timestamp", FALSE,
-                "timeout", (guint64) G_MAXUINT64,
+                "do-timestamp", FALSE,     /* Let playbin handle timing */
+                "timeout", (guint64) G_MAXUINT64, /* Back to original timeout */
                 "channel", "nd-inter-video",
                 NULL);
 
@@ -376,6 +402,18 @@ sink_create_audio_source_cb (NdWindow * self, NdSink * sink)
   }
 
   res = nd_pulseaudio_get_source (self->pulse);
+
+  /* Configure PulseAudio source for low latency if it's a pulsesrc element */
+  if (res && GST_IS_ELEMENT (res)) {
+    const gchar *factory_name = GST_OBJECT_NAME (gst_element_get_factory (res));
+    if (g_strcmp0 (factory_name, "pulsesrc") == 0)
+      g_object_set (res,
+                    "latency-time", 10000,    /* 10ms latency */
+                    "buffer-time", 20000,     /* 20ms buffer */
+                    "provide-clock", FALSE,   /* Don't provide clock */
+                    NULL);
+  }
+
   g_debug ("NdWindow: Using PulseAudio source as fallback");
 
   return g_object_ref_sink (res);
@@ -389,6 +427,17 @@ sink_notify_state_cb (NdWindow *self, GParamSpec *pspec, NdSink *sink)
   g_object_get (sink, "state", &state, NULL);
   g_debug ("Got state change notification from streaming sink to state %s",
            g_enum_to_string (ND_TYPE_SINK_STATE, state));
+
+  if (state == ND_SINK_STATE_STREAMING) {
+    GObjectClass *sink_class = G_OBJECT_GET_CLASS (sink);
+
+    if (g_object_class_find_property (sink_class, "max-lateness"))
+      g_object_set (sink, "max-lateness", (gint64) 16666667, NULL);  /* ~16ms */
+    if (g_object_class_find_property (sink_class, "qos"))
+      g_object_set (sink, "qos", TRUE, NULL);
+    if (g_object_class_find_property (sink_class, "processing-deadline"))
+      g_object_set (sink, "processing-deadline", (gint64) 20000000, NULL);  /* 20ms */
+  }
 
   switch (state)
     {
