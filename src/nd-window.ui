@@ -204,6 +204,7 @@
                                             </child>
                                             <child>
                                               <object class="GtkListBoxRow">
+                                                <property name="visible">False</property>
                                                 <property name="child">
                                                   <object class="GtkButton" id="select_x11_session_button">
                                                     <property name="has-frame">False</property>
