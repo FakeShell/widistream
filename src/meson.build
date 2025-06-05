@@ -7,6 +7,8 @@ gnome_nd_sources = [
   'app/nd-sink-list-model.c',
   'app/nd-sink-row.c',
   'app/nd-window.c',
+  'app/nd-video-file-stream.c',
+  'app/nd-application-window-stream.c',
   'nd-firewalld.c',
   'nd-sink.c',
   'nd-provider.c',

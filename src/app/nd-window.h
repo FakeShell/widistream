@@ -1,6 +1,7 @@
 /* nd-window.h
  *
  * Copyright 2018 Benjamin Berg <bberg@redhat.com>
+ * Copyright 2025 Bardia Moshiri <bardia@furilabs.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,7 +23,9 @@
 
 G_BEGIN_DECLS
 
-#define ND_TYPE_WINDOW (gnome_nd_window_get_type ())
-G_DECLARE_FINAL_TYPE (NdWindow, gnome_nd_window, ND, WINDOW, AdwApplicationWindow)
+#define ND_TYPE_WINDOW (nd_window_get_type())
+G_DECLARE_FINAL_TYPE (NdWindow, nd_window, ND, WINDOW, AdwApplicationWindow)
+
+NdWindow *nd_window_new (void);
 
 G_END_DECLS
