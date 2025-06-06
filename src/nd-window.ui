@@ -411,6 +411,128 @@
                                   </object>
                                 </child>
                                 <child>
+                                  <object class="GtkBox" id="media_controls_box">
+                                    <property name="visible">False</property>
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">16</property>
+                                    <property name="margin-top">16</property>
+
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="label" translatable="yes">Media Controls</property>
+                                        <property name="halign">start</property>
+                                        <attributes>
+                                          <attribute name="weight" value="bold"></attribute>
+                                        </attributes>
+                                      </object>
+                                    </child>
+
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">8</property>
+                                        <child>
+                                          <object class="GtkBox">
+                                            <property name="spacing">12</property>
+                                            <child>
+                                              <object class="GtkLabel" id="current_time_label">
+                                                <property name="label">00:00</property>
+                                                <property name="width-chars">5</property>
+                                                <style>
+                                                  <class name="monospace"/>
+                                                </style>
+                                              </object>
+                                            </child>
+                                            <child>
+                                              <object class="GtkScale" id="progress_scale">
+                                                <property name="hexpand">True</property>
+                                                <property name="orientation">horizontal</property>
+                                                <property name="draw-value">False</property>
+                                                <property name="adjustment">
+                                                  <object class="GtkAdjustment">
+                                                    <property name="lower">0</property>
+                                                    <property name="upper">100</property>
+                                                    <property name="value">0</property>
+                                                    <property name="step-increment">1</property>
+                                                    <property name="page-increment">10</property>
+                                                  </object>
+                                                </property>
+                                              </object>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="total_time_label">
+                                                <property name="label">00:00</property>
+                                                <property name="width-chars">5</property>
+                                                <style>
+                                                  <class name="monospace"/>
+                                                </style>
+                                              </object>
+                                            </child>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="halign">center</property>
+                                        <property name="spacing">12</property>
+                                        <child>
+                                          <object class="GtkButton" id="previous_button">
+                                            <property name="icon-name">media-skip-backward-symbolic</property>
+                                            <property name="tooltip-text" translatable="yes">Previous (or seek backward)</property>
+                                          </object>
+                                        </child>
+                                        <child>
+                                          <object class="GtkButton" id="play_pause_button">
+                                            <property name="icon-name">media-playback-pause-symbolic</property>
+                                            <property name="tooltip-text" translatable="yes">Play/Pause</property>
+                                            <style>
+                                              <class name="suggested-action"/>
+                                              <class name="circular"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child>
+                                          <object class="GtkButton" id="next_button">
+                                            <property name="icon-name">media-skip-forward-symbolic</property>
+                                            <property name="tooltip-text" translatable="yes">Next (or seek forward)</property>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="spacing">12</property>
+                                        <child>
+                                          <object class="GtkImage">
+                                            <property name="icon-name">audio-volume-medium-symbolic</property>
+                                          </object>
+                                        </child>
+                                        <child>
+                                          <object class="GtkScale" id="volume_scale">
+                                            <property name="hexpand">True</property>
+                                            <property name="orientation">horizontal</property>
+                                            <property name="draw-value">True</property>
+                                            <property name="value-pos">right</property>
+                                            <property name="adjustment">
+                                              <object class="GtkAdjustment">
+                                                <property name="lower">0</property>
+                                                <property name="upper">100</property>
+                                                <property name="value">100</property>
+                                                <property name="step-increment">5</property>
+                                                <property name="page-increment">10</property>
+                                              </object>
+                                            </property>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+
+                                <child>
                                   <object class="GtkBox">
                                     <child>
                                       <placeholder/>

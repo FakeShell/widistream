@@ -1,5 +1,4 @@
-/* gnome-nd-window.c
- *
+/*
  * Copyright 2018 Benjamin Berg <bberg@redhat.com>
  * Copyright 2025 Bardia Moshiri <bardia@furilabs.com>
  *
@@ -58,6 +57,10 @@ struct _NdWindow
   /* X11 session support */
   NdX11Session          *x11_session;
 
+  /* Media controls support */
+  gboolean               is_video_file_streaming;
+  guint                  media_update_timeout_id;
+
   GPtrArray             *sink_property_bindings;
 
   /* Template widgets */
@@ -91,24 +94,175 @@ struct _NdWindow
   GListStore      *error_sink_list_model;
   GtkBox          *error_firewall_zone;
   GtkButton       *error_return;
+
+  /* Media control widgets */
+  GtkBox          *media_controls_box;
+  GtkLabel        *current_time_label;
+  GtkLabel        *total_time_label;
+  GtkScale        *progress_scale;
+  GtkButton       *play_pause_button;
+  GtkButton       *previous_button;
+  GtkButton       *next_button;
+  GtkScale        *volume_scale;
+
+  /* Video file stream context */
+  NdVideoFileStream *video_file_stream;
 };
 
 G_DEFINE_FINAL_TYPE (NdWindow, nd_window, ADW_TYPE_APPLICATION_WINDOW)
 
+static gchar *
+format_time (gint64 nanoseconds)
+{
+  gint64 seconds = nanoseconds / GST_SECOND;
+  gint minutes = seconds / 60;
+  gint hours = minutes / 60;
+
+  seconds %= 60;
+  minutes %= 60;
+
+  if (hours > 0)
+    return g_strdup_printf ("%d:%02d:%02d", hours, minutes, (gint)seconds);
+  else
+    return g_strdup_printf ("%d:%02d", minutes, (gint)seconds);
+}
+
+static void
+on_progress_scale_value_changed (GtkRange *range, NdWindow *self)
+{
+  gdouble value = gtk_range_get_value (range);
+  if (self->video_file_stream)
+    nd_video_file_stream_global_seek (self->video_file_stream, value / 100.0);
+  g_debug ("Progress scale: Seeked to position %f", value / 100.0);
+}
+
+static void
+on_volume_scale_value_changed (GtkRange *range, NdWindow *self)
+{
+  gdouble value = gtk_range_get_value (range);
+  if (self->video_file_stream)
+    nd_video_file_stream_global_set_volume (self->video_file_stream, value / 100.0);
+  g_debug ("Volume scale: Set volume to %f", value / 100.0);
+}
+
+static gboolean
+update_media_controls (gpointer user_data)
+{
+  NdWindow *self = ND_WINDOW (user_data);
+
+  if (!self->is_video_file_streaming)
+    return G_SOURCE_REMOVE;
+
+  /* Only update if actually playing (not paused/blocked) */
+  gboolean is_playing = self->video_file_stream &&
+                        nd_video_file_stream_global_is_playing (self->video_file_stream);
+  if (is_playing) {
+    gdouble position = nd_video_file_stream_global_get_position (self->video_file_stream);
+    gint64 duration = nd_video_file_stream_global_get_duration (self->video_file_stream);
+
+    /* Block the signal to prevent recursive calls */
+    g_signal_handlers_block_by_func (self->progress_scale,
+                                     on_progress_scale_value_changed,
+                                     self);
+    gtk_range_set_value (GTK_RANGE (self->progress_scale), position * 100.0);
+    g_signal_handlers_unblock_by_func (self->progress_scale,
+                                       on_progress_scale_value_changed,
+                                       self);
+
+    /* Update time labels */
+    if (duration > 0) {
+      gint64 current_time = (gint64) (position * duration);
+      g_autofree gchar *current_str = format_time (current_time);
+      g_autofree gchar *total_str = format_time (duration);
+
+      gtk_label_set_text (self->current_time_label, current_str);
+      gtk_label_set_text (self->total_time_label, total_str);
+    }
+  }
+
+  /* Always update play/pause button state */
+  const gchar *icon_name = is_playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic";
+  gtk_button_set_icon_name (self->play_pause_button, icon_name);
+
+  return G_SOURCE_CONTINUE;
+}
+
+static void
+on_play_pause_button_clicked (GtkButton *button, NdWindow *self)
+{
+  if (!self->video_file_stream)
+    return;
+
+  if (nd_video_file_stream_global_is_playing (self->video_file_stream)) {
+    nd_video_file_stream_global_pause (self->video_file_stream);
+    g_debug ("Play/Pause: Paused playback");
+  } else {
+    nd_video_file_stream_global_play (self->video_file_stream);
+    g_debug ("Play/Pause: Started playback");
+  }
+}
+
+static void
+on_previous_button_clicked (GtkButton *button, NdWindow *self)
+{
+  if (!self->video_file_stream)
+    return;
+
+  /* Seek backward 10 seconds */
+  gdouble current_pos = nd_video_file_stream_global_get_position (self->video_file_stream);
+  gint64 duration = nd_video_file_stream_global_get_duration (self->video_file_stream);
+
+  if (duration > 0) {
+    gint64 seek_amount = 10 * GST_SECOND; /* 10 seconds */
+    gdouble new_pos = current_pos - ((gdouble) seek_amount / duration);
+    new_pos = CLAMP (new_pos, 0.0, 1.0);
+    nd_video_file_stream_global_seek (self->video_file_stream, new_pos);
+    g_debug ("Previous: Seeked to position %f", new_pos);
+  }
+}
+
+static void
+on_next_button_clicked (GtkButton *button, NdWindow *self)
+{
+  if (!self->video_file_stream)
+    return;
+
+  /* Seek forward 10 seconds */
+  gdouble current_pos = nd_video_file_stream_global_get_position (self->video_file_stream);
+  gint64 duration = nd_video_file_stream_global_get_duration (self->video_file_stream);
+
+  if (duration > 0) {
+    gint64 seek_amount = 10 * GST_SECOND; /* 10 seconds */
+    gdouble new_pos = current_pos + ((gdouble) seek_amount / duration);
+    new_pos = CLAMP (new_pos, 0.0, 1.0);
+    nd_video_file_stream_global_seek (self->video_file_stream, new_pos);
+    g_debug ("Next: Seeked to position %f", new_pos);
+  }
+}
+
 static GstElement *
 sink_create_source_cb (NdWindow *self, NdSink *sink)
 {
+  GstElement *source = NULL;
+
   /* Check if we're streaming X11 session or video file */
   if (nd_x11_session_is_active (self->x11_session)) {
     g_debug ("Creating X11 session source");
-    return nd_application_window_stream_create_source (self->x11_session);
+    source = nd_application_window_stream_create_source (self->x11_session);
   } else if (self->selected_video_file) {
-    g_debug ("Creating video file source");
-    return nd_video_file_stream_create_source (self->selected_video_file);
+    g_debug ("Creating video file source for: %s", self->selected_video_file);
+    /* Free any previous stream before starting a new one */
+    if (self->video_file_stream)
+      nd_video_file_stream_free (self->video_file_stream);
+    self->video_file_stream = nd_video_file_stream_new (self->selected_video_file);
+    source = nd_video_file_stream_get_source (self->video_file_stream);
+    if (source)
+      nd_video_file_stream_initialize_global_references (self->video_file_stream, source);
   } else {
     g_warning ("NdWindow: No content selected for streaming!");
-    return NULL;
   }
+
+  return source;
 }
 
 static GstElement *
@@ -117,10 +271,12 @@ sink_create_audio_source_cb (NdWindow * self, NdSink * sink)
   GstElement *res;
 
   /* First, try to get audio from the video file via interaudiosrc */
-  res = nd_video_file_stream_create_audio_source ();
-  if (res) {
-    g_debug ("NdWindow: Using inter audio source for video file audio");
-    return res;
+  if (self->video_file_stream) {
+    res = nd_video_file_stream_create_audio_source (self->video_file_stream);
+    if (res) {
+      g_debug ("NdWindow: Using inter audio source for video file audio");
+      return res;
+    }
   }
 
   /* Fallback to PulseAudio if inter audio source is not available */
@@ -204,6 +360,27 @@ sink_notify_state_cb (NdWindow *self, GParamSpec *pspec, NdSink *sink)
 
       g_list_store_append (self->stream_sink_list_model, self->stream_sink);
 
+      /* Show/hide media controls based on content type */
+      if (self->selected_video_file) {
+        self->is_video_file_streaming = TRUE;
+        gtk_widget_set_visible (GTK_WIDGET (self->media_controls_box), TRUE);
+
+        /* Start media controls update timer */
+        if (self->media_update_timeout_id == 0)
+          self->media_update_timeout_id = g_timeout_add (1000, update_media_controls, self);
+
+        /* Initialize volume scale and ensure playback starts */
+        gdouble volume = nd_video_file_stream_global_get_volume (self->video_file_stream);
+        if (self->volume_scale)
+          gtk_range_set_value (GTK_RANGE (self->volume_scale), volume * 100.0);
+
+        /* Force playback to start */
+        nd_video_file_stream_global_play (self->video_file_stream);
+      } else {
+        self->is_video_file_streaming = FALSE;
+        gtk_widget_set_visible (GTK_WIDGET (self->media_controls_box), FALSE);
+      }
+
       gtk_stack_set_visible_child_name (self->step_stack, "stream");
       break;
 
@@ -225,6 +402,20 @@ sink_notify_state_cb (NdWindow *self, GParamSpec *pspec, NdSink *sink)
       /* Clean up X11 session if it's running */
       if (nd_x11_session_is_active (self->x11_session))
         nd_x11_session_stop (self->x11_session);
+
+      /* Clean up media controls */
+      self->is_video_file_streaming = FALSE;
+      gtk_widget_set_visible (GTK_WIDGET (self->media_controls_box), FALSE);
+      if (self->media_update_timeout_id != 0) {
+        g_source_remove (self->media_update_timeout_id);
+        self->media_update_timeout_id = 0;
+      }
+
+      /* Clean up video file stream */
+      if (self->video_file_stream) {
+        nd_video_file_stream_free (self->video_file_stream);
+        self->video_file_stream = NULL;
+      }
 
       gtk_stack_set_visible_child_name (self->step_stack, "find");
       g_object_set (self->meta_provider, "discover", TRUE, NULL);
@@ -496,6 +687,16 @@ nd_window_finalize (GObject *obj)
     g_clear_object (&self->pulse);
   }
 
+  /* Clean up media controls */
+  if (self->media_update_timeout_id != 0) {
+    g_source_remove (self->media_update_timeout_id);
+    self->media_update_timeout_id = 0;
+  }
+
+  /* Clean up video file stream */
+  if (self->video_file_stream)
+    nd_video_file_stream_free (self->video_file_stream);
+
   /* Clean up X11 session */
   g_clear_pointer (&self->x11_session, nd_x11_session_free);
 
@@ -552,6 +753,16 @@ nd_window_class_init (NdWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, NdWindow, error_sink_list);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, error_firewall_zone);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, error_return);
+
+  /* Media control widgets */
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, media_controls_box);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, current_time_label);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, total_time_label);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, progress_scale);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, play_pause_button);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, previous_button);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, next_button);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, volume_scale);
 }
 
 static void
@@ -611,6 +822,9 @@ nd_window_init (NdWindow *self)
   self->pending_sink = NULL;
   self->selected_video_file = NULL;
   self->x11_session = nd_x11_session_new ();
+  self->is_video_file_streaming = FALSE;
+  self->media_update_timeout_id = 0;
+  self->video_file_stream = NULL;
 
   self->meta_provider = nd_meta_provider_new ();
   g_signal_connect_object (self->meta_provider,
@@ -693,6 +907,36 @@ nd_window_init (NdWindow *self)
                            (GCallback) stream_stop_clicked_cb,
                            self,
                            G_CONNECT_SWAPPED);
+
+  if (self->play_pause_button)
+    g_signal_connect (self->play_pause_button,
+                      "clicked",
+                      G_CALLBACK (on_play_pause_button_clicked),
+                      self);
+
+  if (self->previous_button)
+    g_signal_connect (self->previous_button,
+                      "clicked",
+                      G_CALLBACK (on_previous_button_clicked),
+                      self);
+
+  if (self->next_button)
+    g_signal_connect (self->next_button,
+                      "clicked",
+                      G_CALLBACK (on_next_button_clicked),
+                      self);
+
+  if (self->progress_scale)
+    g_signal_connect (self->progress_scale,
+                      "value-changed",
+                      G_CALLBACK (on_progress_scale_value_changed),
+                      self);
+
+  if (self->volume_scale)
+    g_signal_connect (self->volume_scale,
+                      "value-changed",
+                      G_CALLBACK (on_volume_scale_value_changed),
+                      self);
 
   pulse = nd_pulseaudio_new ();
   g_async_initable_init_async (G_ASYNC_INITABLE (pulse),
