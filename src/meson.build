@@ -9,6 +9,7 @@ gnome_nd_sources = [
   'app/nd-window.c',
   'app/nd-video-file-stream.c',
   'app/nd-application-window-stream.c',
+  'app/nd-mtk-wifi-manager.c',
   'nd-firewalld.c',
   'nd-sink.c',
   'nd-provider.c',

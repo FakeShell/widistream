@@ -34,6 +34,7 @@
 #include "nd-window.h"
 #include "nd-video-file-stream.h"
 #include "nd-application-window-stream.h"
+#include "nd-mtk-wifi-manager.h"
 
 struct _NdWindow
 {
@@ -56,6 +57,9 @@ struct _NdWindow
 
   /* X11 session support */
   NdX11Session          *x11_session;
+
+  /* MediaTek WiFi Manager */
+  NdMtkWifiManager      *mtk_wifi_manager;
 
   /* Media controls support */
   gboolean               is_video_file_streaming;
@@ -629,6 +633,29 @@ find_sink_list_row_activated_cb (NdWindow *self, NdSinkRow *row, GtkListBox *sin
 }
 
 static void
+on_mtk_wifi_manager_init_cb (GObject      *source_object,
+                             GAsyncResult *res,
+                             gpointer      user_data)
+{
+  NdMtkWifiManager *wifi_manager = ND_MTK_WIFI_MANAGER (source_object);
+  g_autoptr(GError) error = NULL;
+
+  if (!nd_mtk_wifi_manager_init_finish (wifi_manager, res, &error)) {
+    if (error)
+      g_warning ("NdWindow: Failed to initialize MediaTek WiFi manager: %s", error->message);
+    return;
+  }
+
+  if (nd_mtk_wifi_manager_is_available (wifi_manager)) {
+    g_debug ("NdWindow: MediaTek WiFi manager initialized successfully");
+    /* Ensure P2P mode is active */
+    nd_mtk_wifi_manager_ensure_p2p_mode (wifi_manager);
+  } else {
+    g_debug ("NdWindow: MediaTek WiFi manager not available on this system");
+  }
+}
+
+static void
 nd_window_constructed (GObject *obj)
 {
   G_OBJECT_CLASS (nd_window_parent_class)->constructed (obj);
@@ -640,6 +667,11 @@ nd_window_constructed (GObject *obj)
 
   self->cancellable = g_cancellable_new ();
   self->avahi_client = ga_client_new (GA_CLIENT_FLAG_NO_FLAGS);
+
+  self->mtk_wifi_manager = nd_mtk_wifi_manager_new ();
+  nd_mtk_wifi_manager_init_async (self->mtk_wifi_manager,
+                                  on_mtk_wifi_manager_init_cb,
+                                  self);
 
   if (!ga_client_start (self->avahi_client, &error))
     {
@@ -685,6 +717,12 @@ nd_window_finalize (GObject *obj)
   if (self->pulse) {
     nd_pulseaudio_unload (self->pulse);
     g_clear_object (&self->pulse);
+  }
+
+  /* Clean up MediaTek WiFi Manager (this will restore AP mode) */
+  if (self->mtk_wifi_manager) {
+    nd_mtk_wifi_manager_restore_ap_mode (self->mtk_wifi_manager);
+    g_clear_object (&self->mtk_wifi_manager);
   }
 
   /* Clean up media controls */
