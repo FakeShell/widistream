@@ -102,6 +102,33 @@ void nd_mtk_wifi_manager_ensure_p2p_mode (NdMtkWifiManager *self);
 void nd_mtk_wifi_manager_restore_ap_mode (NdMtkWifiManager *self);
 
 /**
+ * nd_mtk_wifi_manager_refresh_p2p_async:
+ * @self: An NdMtkWifiManager
+ * @callback: (nullable): Callback to call when refresh is complete
+ * @user_data: User data for the callback
+ *
+ * Asynchronously refreshes P2P by removing all P2P groups, flushing
+ * the P2P peer table, and starting P2P discovery.
+ */
+void nd_mtk_wifi_manager_refresh_p2p_async (NdMtkWifiManager *self,
+                                            GAsyncReadyCallback callback,
+                                            gpointer user_data);
+
+/**
+ * nd_mtk_wifi_manager_refresh_p2p_finish:
+ * @self: An NdMtkWifiManager
+ * @result: A GAsyncResult
+ * @error: (out) (optional): Error return location
+ *
+ * Finishes the asynchronous P2P refresh operation.
+ *
+ * Returns: %TRUE if the P2P refresh completed successfully
+ */
+gboolean nd_mtk_wifi_manager_refresh_p2p_finish (NdMtkWifiManager *self,
+                                                 GAsyncResult *result,
+                                                 GError **error);
+
+/**
  * nd_mtk_wifi_manager_get_current_state:
  * @self: An NdMtkWifiManager
  *

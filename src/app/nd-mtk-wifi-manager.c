@@ -225,6 +225,83 @@ set_wifi_state (NdMtkWifiManager *self, NdWiFiState state)
                      self);
 }
 
+static void
+refresh_p2p_cb (GObject *source_object,
+                GAsyncResult *res,
+                gpointer user_data)
+{
+  GDBusProxy *proxy = G_DBUS_PROXY (source_object);
+  GTask *task = G_TASK (user_data);
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GVariant) result = NULL;
+  gboolean success = FALSE;
+
+  result = g_dbus_proxy_call_finish (proxy, res, &error);
+
+  if (error) {
+    g_debug ("NdMtkWifiManager: Failed to refresh P2P: %s", error->message);
+    g_task_return_error (task, g_steal_pointer (&error));
+  } else {
+    g_variant_get (result, "(b)", &success);
+    g_debug ("NdMtkWifiManager: P2P refresh completed with success: %s",
+             success ? "true" : "false");
+
+    if (success)
+      g_task_return_boolean (task, TRUE);
+    else
+      g_task_return_new_error (task,
+                               G_IO_ERROR,
+                               G_IO_ERROR_FAILED,
+                               "P2P refresh operation failed");
+  }
+
+  g_object_unref (task);
+}
+
+void
+nd_mtk_wifi_manager_refresh_p2p_async (NdMtkWifiManager *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+  GTask *task;
+
+  g_return_if_fail (ND_IS_MTK_WIFI_MANAGER (self));
+
+  task = g_task_new (self, NULL, callback, user_data);
+
+  if (!self->is_available || !self->proxy) {
+    g_debug ("NdMtkWifiManager: WiFi manager not available, cannot refresh P2P");
+    g_task_return_new_error (task,
+                             G_IO_ERROR,
+                             G_IO_ERROR_NOT_CONNECTED,
+                             "WiFi manager service not available");
+    g_object_unref (task);
+    return;
+  }
+
+  g_debug ("NdMtkWifiManager: Starting P2P refresh");
+
+  g_dbus_proxy_call (self->proxy,
+                     "WpaRefreshP2P",
+                     NULL,
+                     G_DBUS_CALL_FLAGS_NONE,
+                     30000, /* 30 second timeout for P2P operations */
+                     NULL,
+                     refresh_p2p_cb,
+                     task);
+}
+
+gboolean
+nd_mtk_wifi_manager_refresh_p2p_finish (NdMtkWifiManager *self,
+                                        GAsyncResult *result,
+                                        GError **error)
+{
+  g_return_val_if_fail (ND_IS_MTK_WIFI_MANAGER (self), FALSE);
+  g_return_val_if_fail (G_IS_TASK (result), FALSE);
+
+  return g_task_propagate_boolean (G_TASK (result), error);
+}
+
 void
 nd_mtk_wifi_manager_ensure_p2p_mode (NdMtkWifiManager *self)
 {

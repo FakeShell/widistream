@@ -19,6 +19,7 @@
 #pragma once
 
 #include <NetworkManager.h>
+#include "app/nd-mtk-wifi-manager.h"
 #include "nd-provider.h"
 
 G_BEGIN_DECLS
@@ -27,10 +28,14 @@ G_BEGIN_DECLS
 G_DECLARE_FINAL_TYPE (NdWFDP2PProvider, nd_wfd_p2p_provider, ND, WFD_P2P_PROVIDER, GObject)
 
 
-NdWFDP2PProvider * nd_wfd_p2p_provider_new (NMClient * client, NMDevice * device);
+NdWFDP2PProvider * nd_wfd_p2p_provider_new (NMClient *client,
+                                            NMDevice *device,
+                                            NdMtkWifiManager *mtk_wifi_manager);
 
 NMClient *  nd_wfd_p2p_provider_get_client (NdWFDP2PProvider *provider);
 NMDevice *  nd_wfd_p2p_provider_get_device (NdWFDP2PProvider *provider);
 
+void nd_wfd_p2p_provider_set_mtk_wifi_manager (NdWFDP2PProvider *provider,
+                                               NdMtkWifiManager *mtk_wifi_manager);
 
 G_END_DECLS

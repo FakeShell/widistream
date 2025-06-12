@@ -27,6 +27,7 @@ struct _NdNMDeviceRegistry
 
   GPtrArray      *providers;
   NdMetaProvider *meta_provider;
+  NdMtkWifiManager *mtk_wifi_manager;
 
   GCancellable   *cancellable;
   NMClient       *nm_client;
@@ -34,6 +35,7 @@ struct _NdNMDeviceRegistry
 
 enum {
   PROP_META_PROVIDER = 1,
+  PROP_MTK_WIFI_MANAGER,
   PROP_LAST,
 };
 
@@ -51,7 +53,7 @@ device_added_cb (NdNMDeviceRegistry *registry, NMDevice *device, NMClient *clien
 
   g_debug ("NdNMDeviceRegistry: Found a new device, creating provider");
 
-  provider = nd_wfd_p2p_provider_new (client, device);
+  provider = nd_wfd_p2p_provider_new (client, device, registry->mtk_wifi_manager);
 
   g_ptr_array_add (registry->providers, g_object_ref (provider));
   nd_meta_provider_add_provider (registry->meta_provider,
@@ -76,6 +78,27 @@ device_removed_cb (NdNMDeviceRegistry *registry, NMDevice *device, NMClient *cli
       nd_meta_provider_remove_provider (registry->meta_provider, ND_PROVIDER (provider));
       g_ptr_array_remove_index (registry->providers, i);
       break;
+    }
+}
+
+void
+nd_nm_device_registry_set_mtk_wifi_manager (NdNMDeviceRegistry *registry,
+                                            NdMtkWifiManager *mtk_wifi_manager)
+{
+  g_return_if_fail (ND_IS_NM_DEVICE_REGISTRY (registry));
+
+  if (registry->mtk_wifi_manager == mtk_wifi_manager)
+    return;
+
+  g_clear_object (&registry->mtk_wifi_manager);
+  if (mtk_wifi_manager)
+    registry->mtk_wifi_manager = g_object_ref (mtk_wifi_manager);
+
+  /* Update all existing providers */
+  for (gint i = 0; i < registry->providers->len; i++)
+    {
+      NdWFDP2PProvider *provider = g_ptr_array_index (registry->providers, i);
+      nd_wfd_p2p_provider_set_mtk_wifi_manager (provider, mtk_wifi_manager);
     }
 }
 
@@ -116,6 +139,12 @@ nd_nm_device_registry_set_property (GObject      *object,
 
       break;
 
+    case PROP_MTK_WIFI_MANAGER:
+      g_assert (registry->mtk_wifi_manager == NULL);
+
+      registry->mtk_wifi_manager = g_value_dup_object (value);
+
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -212,6 +241,12 @@ nd_nm_device_registry_class_init (NdNMDeviceRegistryClass *klass)
                          ND_TYPE_META_PROVIDER,
                          G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
+  props[PROP_MTK_WIFI_MANAGER] =
+    g_param_spec_object ("mtk-wifi-manager", "MTK WiFi Manager",
+                         "The MediaTek WiFi manager for P2P operations.",
+                         ND_TYPE_MTK_WIFI_MANAGER,
+                         G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
   g_object_class_install_properties (object_class, PROP_LAST, props);
 }
 
@@ -222,9 +257,11 @@ nd_nm_device_registry_init (NdNMDeviceRegistry *registry)
 }
 
 NdNMDeviceRegistry *
-nd_nm_device_registry_new (NdMetaProvider *meta_provider)
+nd_nm_device_registry_new (NdMetaProvider *meta_provider,
+                           NdMtkWifiManager *mtk_wifi_manager)
 {
   return g_object_new (ND_TYPE_NM_DEVICE_REGISTRY,
                        "meta-provider", meta_provider,
+                       "mtk-wifi-manager", mtk_wifi_manager,
                        NULL);
 }

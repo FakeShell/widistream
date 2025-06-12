@@ -28,6 +28,7 @@ struct _NdWFDP2PProvider
 
   NMClient  *nm_client;
   NMDevice  *nm_device;
+  NdMtkWifiManager *mtk_wifi_manager;
 
   gboolean   discover;
   guint      p2p_find_source_id;
@@ -36,6 +37,7 @@ struct _NdWFDP2PProvider
 enum {
   PROP_CLIENT = 1,
   PROP_DEVICE,
+  PROP_MTK_WIFI_MANAGER,
 
   PROP_DISCOVER,
 
@@ -128,6 +130,22 @@ peer_removed_cb (NdWFDP2PProvider *provider, NMWifiP2PPeer *peer, NMDevice *devi
     }
 }
 
+void
+nd_wfd_p2p_provider_set_mtk_wifi_manager (NdWFDP2PProvider *provider,
+                                          NdMtkWifiManager *mtk_wifi_manager)
+{
+  g_return_if_fail (ND_IS_WFD_P2P_PROVIDER (provider));
+
+  if (provider->mtk_wifi_manager == mtk_wifi_manager)
+    return;
+
+  g_clear_object (&provider->mtk_wifi_manager);
+  if (mtk_wifi_manager)
+    provider->mtk_wifi_manager = g_object_ref (mtk_wifi_manager);
+
+  g_debug ("WFDP2PProvider: MTK WiFi manager %s", mtk_wifi_manager ? "set" : "cleared");
+}
+
 static void
 nd_wfd_p2p_provider_get_property (GObject    *object,
                                   guint       prop_id,
@@ -146,6 +164,10 @@ nd_wfd_p2p_provider_get_property (GObject    *object,
     case PROP_DEVICE:
       g_assert (provider->nm_device == NULL);
       g_value_set_object (value, provider->nm_device);
+      break;
+
+    case PROP_MTK_WIFI_MANAGER:
+      g_value_set_object (value, provider->mtk_wifi_manager);
       break;
 
     case PROP_DISCOVER:
@@ -182,14 +204,52 @@ device_restart_find_timeout (gpointer user_data)
 }
 
 static void
+on_mtk_p2p_refresh_complete (GObject      *source_object,
+                             GAsyncResult *res,
+                             gpointer      user_data)
+{
+  NdMtkWifiManager *wifi_manager = ND_MTK_WIFI_MANAGER (source_object);
+  NdWFDP2PProvider *provider = ND_WFD_P2P_PROVIDER (user_data);
+  g_autoptr(GError) error = NULL;
+  gboolean success;
+
+  success = nd_mtk_wifi_manager_refresh_p2p_finish (wifi_manager, res, &error);
+
+  if (success) {
+    g_debug ("WFDP2PProvider: MTK P2P refresh completed successfully, proceeding with NetworkManager discovery");
+  } else {
+    g_warning ("WFDP2PProvider: MTK P2P refresh failed: %s, proceeding anyway",
+               error ? error->message : "Unknown error");
+  }
+
+  /* Proceed with NetworkManager P2P discovery regardless of MTK refresh result */
+  nm_device_wifi_p2p_start_find (NM_DEVICE_WIFI_P2P (provider->nm_device), NULL, NULL, log_start_find_error, NULL);
+  if (!provider->p2p_find_source_id)
+    provider->p2p_find_source_id = g_timeout_add_seconds (20, device_restart_find_timeout, provider);
+}
+
+static void
 discovery_start_stop (NdWFDP2PProvider *provider, NMDeviceState state)
 {
   if (provider->discover && state > NM_DEVICE_STATE_UNAVAILABLE)
     {
       g_debug ("WFDP2PProvider: Starting P2P discovery.");
-      nm_device_wifi_p2p_start_find (NM_DEVICE_WIFI_P2P (provider->nm_device), NULL, NULL, log_start_find_error, NULL);
-      if (!provider->p2p_find_source_id)
-        provider->p2p_find_source_id = g_timeout_add_seconds (20, device_restart_find_timeout, provider);
+
+      /* Refresh MTK P2P if available before starting NetworkManager discovery */
+      if (provider->mtk_wifi_manager /* && nd_mtk_wifi_manager_is_available (provider->mtk_wifi_manager) */)
+        {
+          g_debug ("WFDP2PProvider: Refreshing MTK P2P before NetworkManager discovery");
+          nd_mtk_wifi_manager_refresh_p2p_async (provider->mtk_wifi_manager,
+                                                 on_mtk_p2p_refresh_complete,
+                                                 provider);
+        }
+      else
+        {
+          g_debug ("WFDP2PProvider: MTK WiFi manager not available, proceeding with NetworkManager discovery");
+          nm_device_wifi_p2p_start_find (NM_DEVICE_WIFI_P2P (provider->nm_device), NULL, NULL, log_start_find_error, NULL);
+          if (!provider->p2p_find_source_id)
+            provider->p2p_find_source_id = g_timeout_add_seconds (20, device_restart_find_timeout, provider);
+        }
     }
   else
     {
@@ -271,6 +331,11 @@ nd_wfd_p2p_provider_set_property (GObject      *object,
 
       break;
 
+    case PROP_MTK_WIFI_MANAGER:
+      /* Construct only */
+      provider->mtk_wifi_manager = g_value_dup_object (value);
+      break;
+
     case PROP_DISCOVER:
       provider->discover = g_value_get_boolean (value);
       g_debug ("WFDP2PProvider: Discover is now set to %d", provider->discover);
@@ -297,6 +362,7 @@ nd_wfd_p2p_provider_finalize (GObject *object)
   g_clear_pointer (&provider->sinks, g_ptr_array_unref);
   g_clear_object (&provider->nm_client);
   g_clear_object (&provider->nm_device);
+  g_clear_object (&provider->mtk_wifi_manager);
 
   G_OBJECT_CLASS (nd_wfd_p2p_provider_parent_class)->finalize (object);
 }
@@ -320,6 +386,12 @@ nd_wfd_p2p_provider_class_init (NdWFDP2PProviderClass *klass)
     g_param_spec_object ("device", "Device",
                          "The NMDevice the sink was found on.",
                          NM_TYPE_DEVICE,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
+
+  props[PROP_MTK_WIFI_MANAGER] =
+    g_param_spec_object ("mtk-wifi-manager", "MTK WiFi Manager",
+                         "The MediaTek WiFi manager for P2P operations.",
+                         ND_TYPE_MTK_WIFI_MANAGER,
                          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS);
 
   g_object_class_install_properties (object_class, PROP_LAST, props);
@@ -389,10 +461,13 @@ nd_wfd_p2p_provider_get_device (NdWFDP2PProvider *provider)
 
 
 NdWFDP2PProvider *
-nd_wfd_p2p_provider_new (NMClient *client, NMDevice *device)
+nd_wfd_p2p_provider_new (NMClient *client,
+                         NMDevice *device,
+                         NdMtkWifiManager *mtk_wifi_manager)
 {
   return g_object_new (ND_TYPE_WFD_P2P_PROVIDER,
                        "client", client,
                        "device", device,
+                       "mtk-wifi-manager", mtk_wifi_manager,
                        NULL);
 }

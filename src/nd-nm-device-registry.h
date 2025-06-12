@@ -19,12 +19,17 @@
 #pragma once
 
 #include "nd-meta-provider.h"
+#include "app/nd-mtk-wifi-manager.h"
 
 G_BEGIN_DECLS
 
 #define ND_TYPE_NM_DEVICE_REGISTRY (nd_nm_device_registry_get_type ())
 G_DECLARE_FINAL_TYPE (NdNMDeviceRegistry, nd_nm_device_registry, ND, NM_DEVICE_REGISTRY, GObject)
 
-NdNMDeviceRegistry * nd_nm_device_registry_new (NdMetaProvider * meta_provider);
+NdNMDeviceRegistry *nd_nm_device_registry_new (NdMetaProvider *meta_provider,
+                                               NdMtkWifiManager *mtk_wifi_manager);
+
+void nd_nm_device_registry_set_mtk_wifi_manager (NdNMDeviceRegistry *registry,
+                                                 NdMtkWifiManager *mtk_wifi_manager);
 
 G_END_DECLS

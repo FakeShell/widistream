@@ -633,23 +633,62 @@ find_sink_list_row_activated_cb (NdWindow *self, NdSinkRow *row, GtkListBox *sin
 }
 
 static void
+on_mtk_wifi_manager_refresh_p2p_cb (GObject      *source_object,
+                                    GAsyncResult *res,
+                                    gpointer      user_data)
+{
+  NdMtkWifiManager *wifi_manager = ND_MTK_WIFI_MANAGER (source_object);
+  g_autoptr(GError) error = NULL;
+  gboolean success;
+
+  success = nd_mtk_wifi_manager_refresh_p2p_finish (wifi_manager, res, &error);
+
+  if (success)
+    g_debug ("NdWindow: P2P refresh completed successfully");
+  else
+    g_debug ("NdWindow: P2P refresh failed: %s", error ? error->message : "Unknown error");
+}
+
+static gboolean
+p2p_refresh_timeout (gpointer user_data)
+{
+  NdMtkWifiManager *wifi_manager = ND_MTK_WIFI_MANAGER (user_data);
+
+  g_debug ("NdWindow: Starting P2P refresh");
+
+  nd_mtk_wifi_manager_refresh_p2p_async (wifi_manager,
+                                         on_mtk_wifi_manager_refresh_p2p_cb,
+                                         NULL);
+
+  return G_SOURCE_REMOVE;
+}
+
+static void
 on_mtk_wifi_manager_init_cb (GObject      *source_object,
                              GAsyncResult *res,
                              gpointer      user_data)
 {
   NdMtkWifiManager *wifi_manager = ND_MTK_WIFI_MANAGER (source_object);
+  NdWindow *self = ND_WINDOW (user_data);
   g_autoptr(GError) error = NULL;
 
   if (!nd_mtk_wifi_manager_init_finish (wifi_manager, res, &error)) {
     if (error)
-      g_warning ("NdWindow: Failed to initialize MediaTek WiFi manager: %s", error->message);
+      g_debug ("NdWindow: Failed to initialize MediaTek WiFi manager: %s", error->message);
     return;
   }
 
   if (nd_mtk_wifi_manager_is_available (wifi_manager)) {
     g_debug ("NdWindow: MediaTek WiFi manager initialized successfully");
+
+    /* Update the device registry with the initialized MTK WiFi manager */
+    nd_nm_device_registry_set_mtk_wifi_manager (self->nm_device_registry, wifi_manager);
+
     /* Ensure P2P mode is active */
     nd_mtk_wifi_manager_ensure_p2p_mode (wifi_manager);
+
+    /* Schedule P2P refresh after 3 seconds to allow mode switch to complete */
+    g_timeout_add_seconds (3, p2p_refresh_timeout, wifi_manager);
   } else {
     g_debug ("NdWindow: MediaTek WiFi manager not available on this system");
   }
@@ -871,7 +910,7 @@ nd_window_init (NdWindow *self)
                            self,
                            G_CONNECT_SWAPPED);
 
-  self->nm_device_registry = nd_nm_device_registry_new (self->meta_provider);
+  self->nm_device_registry = nd_nm_device_registry_new (self->meta_provider, self->mtk_wifi_manager);
 
   self->connect_sink_list_model = g_list_store_new (ND_TYPE_SINK);
   self->stream_sink_list_model = g_list_store_new (ND_TYPE_SINK);
