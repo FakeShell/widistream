@@ -616,12 +616,14 @@
                                 </child>
                                 <child>
                                   <object class="NdCodecInstall" id="codec_install_audio">
+                                    <property name="visible">False</property>
                                     <property name="title" translatable="yes">One of the following codec plugins is required for audio support.
 Clicking will start the installation process.</property>
                                   </object>
                                 </child>
                                 <child>
                                   <object class="NdCodecInstall" id="codec_install_video">
+                                    <property name="visible">False</property>
                                     <property name="title" translatable="yes">One of the following codec plugins is required for video support.
 Clicking will start the installation process.</property>
                                   </object>
