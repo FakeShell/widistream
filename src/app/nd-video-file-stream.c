@@ -509,9 +509,10 @@ nd_video_file_stream_initialize_global_references (NdVideoFileStream *stream, Gs
 GstElement *
 nd_video_file_stream_create_source (const gchar *video_file_path)
 {
-  GstElement *playbin, *videosink, *audiosink, *res;
+  GstElement *playbin, *videosink, *audiosink, *res, *videoscale, *capsfilter;
   GstBin *bin;
   gchar *uri;
+  GstCaps *caps;
 
   if (!video_file_path) {
     g_warning ("nd_video_file_stream_create_source: No video file path provided!");
@@ -615,8 +616,11 @@ nd_video_file_stream_create_source (const gchar *video_file_path)
 
   /* intervideosrc for output */
   res = gst_element_factory_make ("intervideosrc", "screencastsrc");
-  if (!res) {
-    g_warning ("Failed to create intervideosrc element");
+  videoscale = gst_element_factory_make ("videoscale", "downscale");
+  capsfilter = gst_element_factory_make ("capsfilter", "cap720p");
+
+  if (!res || !videoscale || !capsfilter) {
+    g_warning ("Failed to create intervideosrc or scaling elements");
     gst_object_unref (bin);
     return NULL;
   }
@@ -627,11 +631,23 @@ nd_video_file_stream_create_source (const gchar *video_file_path)
                 "channel", "nd-inter-video",
                 NULL);
 
-  gst_bin_add (bin, res);
+  caps = gst_caps_new_simple ("video/x-raw",
+                              "width", G_TYPE_INT, 1280,
+                              "height", G_TYPE_INT, 720,
+                              NULL);
+  g_object_set (capsfilter, "caps", caps, NULL);
+  gst_caps_unref (caps);
+
+  gst_bin_add_many (bin, res, videoscale, capsfilter, NULL);
+  if (!gst_element_link_many (res, videoscale, capsfilter, NULL)) {
+    g_warning ("Failed to link intervideosrc -> videoscale -> capsfilter");
+    gst_object_unref (bin);
+    return NULL;
+  }
 
   gst_element_add_pad (GST_ELEMENT (bin),
                        gst_ghost_pad_new ("src",
-                                          gst_element_get_static_pad (res, "src")));
+                                          gst_element_get_static_pad (capsfilter, "src")));
 
   g_object_ref_sink (bin);
   return GST_ELEMENT (bin);
