@@ -35,6 +35,7 @@
 #include "nd-video-file-stream.h"
 #include "nd-application-window-stream.h"
 #include "nd-mtk-wifi-manager.h"
+#include "nd-mutter-screencast.h"
 
 struct _NdWindow
 {
@@ -65,6 +66,10 @@ struct _NdWindow
   gboolean               is_video_file_streaming;
   guint                  media_update_timeout_id;
 
+  /* Mutter ScreenCast support */
+  NdMutterScreencast    *mutter_screencast;
+  gboolean               is_screencast_streaming;
+
   GPtrArray             *sink_property_bindings;
 
   /* Template widgets */
@@ -78,6 +83,7 @@ struct _NdWindow
   GtkButton       *select_video_file_button;
   GtkButton       *select_content_back_button;
   GtkButton       *select_x11_session_button;
+  GtkButton       *select_desktop_capture_button;
 
   GtkListBox      *connect_sink_list;
   GListStore      *connect_sink_list_model;
@@ -249,8 +255,11 @@ sink_create_source_cb (NdWindow *self, NdSink *sink)
 {
   GstElement *source = NULL;
 
-  /* Check if we're streaming X11 session or video file */
-  if (nd_x11_session_is_active (self->x11_session)) {
+  /* Check if we're streaming X11 session, video file, or desktop capture */
+ if (self->is_screencast_streaming && self->mutter_screencast) {
+    g_debug ("Creating Mutter ScreenCast source");
+    source = nd_mutter_screencast_get_source (self->mutter_screencast);
+  } else if (nd_x11_session_is_active (self->x11_session)) {
     g_debug ("Creating X11 session source");
     source = nd_application_window_stream_create_source (self->x11_session);
   } else if (self->selected_video_file) {
@@ -407,6 +416,12 @@ sink_notify_state_cb (NdWindow *self, GParamSpec *pspec, NdSink *sink)
       if (nd_x11_session_is_active (self->x11_session))
         nd_x11_session_stop (self->x11_session);
 
+      /* Clean up desktop capture if it's running */
+      if (self->is_screencast_streaming && self->mutter_screencast) {
+        nd_mutter_screencast_stop_capture (self->mutter_screencast);
+        self->is_screencast_streaming = FALSE;
+      }
+
       /* Clean up media controls */
       self->is_video_file_streaming = FALSE;
       gtk_widget_set_visible (GTK_WIDGET (self->media_controls_box), FALSE);
@@ -512,6 +527,40 @@ setup_streaming_with_pending_sink (NdWindow *self)
 }
 
 static void
+select_desktop_capture_button_clicked_cb (NdWindow *self)
+{
+  GError *error = NULL;
+
+  if (!self->mutter_screencast)
+    self->mutter_screencast = nd_mutter_screencast_new ();
+
+  if (!nd_mutter_screencast_is_available (self->mutter_screencast)) {
+    GtkAlertDialog *dialog = gtk_alert_dialog_new (_("Desktop Capture Not Available"));
+    gtk_alert_dialog_set_detail (dialog, _("GNOME Shell ScreenCast is not available. Please ensure you are running GNOME Shell on Wayland."));
+    gtk_alert_dialog_show (dialog, GTK_WINDOW (self));
+    g_object_unref (dialog);
+    return;
+  }
+
+  /* Start full screen capture (0,0,0,0 means full screen) */
+  if (!nd_mutter_screencast_start_capture (self->mutter_screencast, 0, 0, 0, 0, &error)) {
+    GtkAlertDialog *dialog = gtk_alert_dialog_new (_("Failed to Start Desktop Capture"));
+    gtk_alert_dialog_set_detail (dialog, error ? error->message : _("Unknown error occurred"));
+    gtk_alert_dialog_show (dialog, GTK_WINDOW (self));
+    g_object_unref (dialog);
+    if (error)
+      g_error_free (error);
+    return;
+  }
+
+  self->is_screencast_streaming = TRUE;
+  g_debug ("NdWindow: Desktop capture started successfully");
+
+  /* Proceed with streaming the desktop capture */
+  setup_streaming_with_pending_sink (self);
+}
+
+static void
 on_file_dialog_response (GObject *source_object,
                          GAsyncResult *res,
                          gpointer user_data)
@@ -613,6 +662,12 @@ select_video_file_button_clicked_cb (NdWindow *self)
 static void
 select_content_back_button_clicked_cb (NdWindow *self)
 {
+  /* Clean up any active captures */
+  if (self->is_screencast_streaming && self->mutter_screencast) {
+    nd_mutter_screencast_stop_capture (self->mutter_screencast);
+    self->is_screencast_streaming = FALSE;
+  }
+
   /* Go back to device selection and clean up pending sink */
   g_clear_object (&self->pending_sink);
   gtk_stack_set_visible_child_name (self->step_stack, "find");
@@ -764,6 +819,12 @@ nd_window_finalize (GObject *obj)
     g_clear_object (&self->mtk_wifi_manager);
   }
 
+  /* Clean up Mutter ScreenCast */
+  if (self->mutter_screencast) {
+    nd_mutter_screencast_free (self->mutter_screencast);
+    self->mutter_screencast = NULL;
+  }
+
   /* Clean up media controls */
   if (self->media_update_timeout_id != 0) {
     g_source_remove (self->media_update_timeout_id);
@@ -819,6 +880,7 @@ nd_window_class_init (NdWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, NdWindow, select_video_file_button);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, select_content_back_button);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, select_x11_session_button);
+  gtk_widget_class_bind_template_child (widget_class, NdWindow, select_desktop_capture_button);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, connect_sink_list);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, connect_state_label);
   gtk_widget_class_bind_template_child (widget_class, NdWindow, connect_cancel);
@@ -902,6 +964,8 @@ nd_window_init (NdWindow *self)
   self->is_video_file_streaming = FALSE;
   self->media_update_timeout_id = 0;
   self->video_file_stream = NULL;
+  self->mutter_screencast = NULL;
+  self->is_screencast_streaming = FALSE;
 
   self->meta_provider = nd_meta_provider_new ();
   g_signal_connect_object (self->meta_provider,
@@ -945,6 +1009,12 @@ nd_window_init (NdWindow *self)
                            G_CONNECT_SWAPPED);
 
   /* Connect content selection page signals */
+  g_signal_connect_object (self->select_desktop_capture_button,
+                           "clicked",
+                           (GCallback) select_desktop_capture_button_clicked_cb,
+                           self,
+                           G_CONNECT_SWAPPED);
+
   g_signal_connect_object (self->select_video_file_button,
                            "clicked",
                            (GCallback) select_video_file_button_clicked_cb,
